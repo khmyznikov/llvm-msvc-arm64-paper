@@ -1,0 +1,29 @@
+{
+    "version": 6,
+    "cmakeMinimumRequired": { "major": 3, "minor": 25, "patch": 0 },
+    "configurePresets": [
+        {
+            "name": "msvc-arm64-release",
+            "displayName": "MSVC ARM64 Release (no LTCG)",
+            "description": "Visual Studio 2022 generator, ARM64, Release. No LTCG/LTO, no PGO.",
+            "generator": "Visual Studio 17 2022",
+            "architecture": {
+                "value": "ARM64",
+                "strategy": "set"
+            },
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release",
+                "WITH_CYCLES_CUDA_BINARIES": "OFF",
+                "WITH_CYCLES_HIP_BINARIES": "OFF",
+                "WITH_CYCLES_ONEAPI_BINARIES": "OFF"
+            }
+        }
+    ],
+    "buildPresets": [
+        {
+            "name": "msvc-arm64-release",
+            "configurePreset": "msvc-arm64-release",
+            "configuration": "Release"
+        }
+    ]
+}

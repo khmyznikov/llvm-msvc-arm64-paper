@@ -1,0 +1,4 @@
+root: .
+sources_dir: sources
+build_dir: build
+results_dir: results

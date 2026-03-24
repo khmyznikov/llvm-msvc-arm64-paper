@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  MSBuild property override for LAME ARM64 builds.
+  Import via /p:ForceImportBeforeCppTargets="path/to/vs2019_arm64_override.props"
+-->
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+
+  <ItemDefinitionGroup Condition="'$(Platform)'=='ARM64'">
+    <ClCompile>
+      <!-- Full optimization, fast floating-point, no buffer security checks -->
+      <Optimization>MaxSpeed</Optimization>
+      <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
+      <FloatingPointModel>Fast</FloatingPointModel>
+      <BufferSecurityCheck>false</BufferSecurityCheck>
+      <WholeProgramOptimization>true</WholeProgramOptimization>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <!-- Disable x86/x64-specific options that don't apply to ARM64 -->
+      <EnableEnhancedInstructionSet />
+      <!-- Suppress NASM-related macros -->
+      <PreprocessorDefinitions>NDEBUG;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+    <Link>
+      <LinkTimeCodeGeneration>UseLinkTimeCodeGeneration</LinkTimeCodeGeneration>
+      <OptimizeReferences>true</OptimizeReferences>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+    </Link>
+    <Lib>
+      <LinkTimeCodeGeneration>true</LinkTimeCodeGeneration>
+    </Lib>
+  </ItemDefinitionGroup>
+
+  <!-- For ClangCL toolset, remap to clang-cl compatible flags -->
+  <ItemDefinitionGroup Condition="'$(Platform)'=='ARM64' and '$(PlatformToolset)'=='ClangCL'">
+    <ClCompile>
+      <!-- clang-cl handles /O2 /fp:fast natively; add -ffast-math for full effect -->
+      <AdditionalOptions>-ffast-math %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
+    <Link>
+      <!-- Use lld-link for LTO -->
+      <AdditionalOptions>-fuse-ld=lld %(AdditionalOptions)</AdditionalOptions>
+    </Link>
+  </ItemDefinitionGroup>
+
+</Project>

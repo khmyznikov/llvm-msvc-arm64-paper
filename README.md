@@ -1,0 +1,166 @@
+# MSVC vs LLVM on Windows ARM64 — Benchmarks
+
+Automated build, benchmark, and profiling framework for comparing MSVC and LLVM (clang-cl) compiler output on Windows ARM64 across five open-source projects.
+
+## Projects
+
+| Project | Source | Build System | Benchmark |
+|---------|--------|-------------|-----------|
+| **LAME MP3** | SVN r6531 | MSBuild (VS2019) | Encode WAV → MP3, 20 runs |
+| **NumPy** | v2.4.1 | Meson | `count_nonzero` (1M elements) |
+| **CPython** | v3.14.2 | MSBuild (PCBuild) | pyperformance (112 benchmarks) + pybench |
+| **Custom strcmp** | Local | Direct cl/clang-cl | Byte-by-byte comparison, 3 runs |
+| **Blender** | v5.0.1 | CMake | 14 official benchmark scenes |
+
+## Prerequisites
+
+- **Windows ARM64** machine (e.g., Qualcomm Cobalt 100)
+- **Visual Studio 2022** with ARM64 C++ workload (MSVC ≥ 14.50)
+- **LLVM ≥ 21.x** with clang-cl and lld-link
+- **Python 3.x** with pip
+- **Git**, **SVN** (for LAME), **Meson**, **Ninja**, **CMake**
+- **Windows Performance Toolkit** (xperf) for profiling
+
+### Validate environment
+
+```powershell
+.\setup_env.ps1           # Check all tools
+.\setup_env.ps1 -Install  # Auto-install missing tools via winget
+```
+
+## Quick start
+
+```bash
+# 1. Install Python dependencies
+pip install -r requirements.txt
+
+# 2. List all available tasks
+inv --list
+
+# 3. Build everything with both toolchains
+inv fetch-all
+inv build-all --toolchain=both
+
+# 4. Run all benchmarks
+inv bench-all
+
+# 5. Capture ETW profiles
+inv profile-all
+```
+
+## Per-project commands
+
+### LAME MP3
+
+```bash
+inv lame.fetch                          # SVN checkout r6531
+inv lame.patch                          # Add ARM64 platform + configMS.h fix
+inv lame.build --toolchain=msvc         # Build with MSVC
+inv lame.build --toolchain=llvm         # Build with clang-cl
+inv lame.bench --toolchain=msvc         # Benchmark (20 encoding runs)
+inv lame.profile --toolchain=msvc       # ETW CPU sampling trace
+```
+
+### NumPy
+
+```bash
+inv numpy.fetch                         # Git clone v2.4.1
+inv numpy.build --toolchain=msvc        # Meson build with MSVC
+inv numpy.build --toolchain=llvm        # Meson build with clang-cl
+inv numpy.bench --toolchain=msvc        # count_nonzero benchmark
+inv numpy.profile --toolchain=msvc      # ETW trace
+```
+
+### CPython
+
+```bash
+inv cpython.fetch                       # Git clone v3.14.2 + externals
+inv cpython.patch                       # Copy profiling props to PCbuild
+inv cpython.build --toolchain=msvc      # Non-PGO build
+inv cpython.build --toolchain=msvc --pgo  # PGO build
+inv cpython.build --toolchain=llvm      # clang-cl build
+inv cpython.bench --toolchain=msvc      # pyperformance (112 benchmarks)
+inv cpython.bench-pybench --toolchain=msvc  # pybench
+inv cpython.profile --toolchain=msvc --benchmark=deltablue  # ETW trace
+```
+
+### Custom strcmp
+
+```bash
+inv strcmp.build --toolchain=both       # Build all 4 variants (msvc/llvm × inline/noinline)
+inv strcmp.bench                        # Run all variants, 3 runs each
+inv strcmp.profile --toolchain=msvc     # ETW trace of inline MSVC variant
+inv strcmp.profile --toolchain=llvm --noinline  # ETW trace of noinline LLVM variant
+```
+
+### Blender (preliminary)
+
+```bash
+inv blender.fetch                       # Clone + download prebuilt deps (~GB)
+inv blender.build --toolchain=msvc      # CMake Release build (no LTCG)
+inv blender.build --toolchain=llvm      # clang-cl Release build (no LTO)
+inv blender.bench --toolchain=msvc      # Render all 14 benchmark scenes
+inv blender.profile --toolchain=msvc --scene=bmw27  # ETW trace
+```
+
+## Results
+
+Benchmark results are saved to `results/` as JSON files:
+
+```
+results/
+├── lame/
+│   ├── lame_msvc.json
+│   └── lame_llvm.json
+├── numpy/
+│   ├── numpy_msvc.json
+│   └── numpy_llvm.json
+├── cpython/
+│   ├── pyperformance_msvc.json
+│   ├── pyperformance_llvm.json
+│   ├── pyperformance_msvc_pgo.json
+│   └── pyperformance_llvm_pgo.json
+├── strcmp/
+│   └── strcmp_results.json
+└── blender/
+    ├── blender_msvc.json
+    └── blender_llvm.json
+```
+
+ETW traces (`.etl` files) are also saved to the respective results subdirectories.
+
+## Compiler flags
+
+| | MSVC | LLVM (clang-cl) |
+|---|------|-----------------|
+| **Optimization** | `/O2` | `-O3` |
+| **LTO** | `/GL` + `/LTCG` | `-flto` + `-fuse-ld=lld` |
+| **Fast math** | `/fp:fast` | `-ffast-math` |
+| **Security** | `/GS-` | `/GS-` |
+
+## Profiling
+
+ETW CPU sampling traces are captured using `xperf` from Windows Performance Toolkit. Frame pointers are enabled (`/Oy-` for MSVC, `-fno-omit-frame-pointer` for clang-cl) to support ETW stack walking.
+
+Analyze traces with [Profile Explorer](https://github.com/niclaslindstedt/profile-explorer) or Windows Performance Analyzer (WPA).
+
+## Directory structure
+
+```
+├── setup_env.ps1                 # Environment validation
+├── tasks.py                      # Root Invoke orchestrator
+├── invoke.yaml                   # Invoke config
+├── requirements.txt              # Python dependencies
+├── common/
+│   ├── config.py                 # Central config (versions, flags, paths)
+│   ├── toolchain.py              # MSVC/LLVM detection helpers
+│   └── profiling.py              # ETW/xperf wrappers
+├── benchmarks/
+│   ├── lame/                     # LAME MP3 encoder
+│   ├── numpy/                    # NumPy count_nonzero
+│   ├── cpython/                  # CPython pyperformance
+│   ├── strcmp/                   # Custom strcmp benchmark
+│   └── blender/                  # Blender render benchmark
+├── results/                      # Benchmark output (gitignored)
+└── sources/                      # Auto-fetched sources (gitignored)
+```

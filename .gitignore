@@ -1,0 +1,42 @@
+# Build artifacts
+build/
+sources/
+*.obj
+*.pdb
+*.ilk
+*.exp
+*.lib
+
+# Results (keep .gitkeep)
+results/*
+!results/.gitkeep
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.eggs/
+dist/
+*.whl
+venv/
+.venv/
+
+# IDE
+.vs/
+.vscode/
+*.suo
+*.user
+*.sln.docstates
+
+# OS
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# ETW traces
+*.etl
+*.etl.ngenpdb/
+
+# Temporary benchmark outputs
+*.mp3

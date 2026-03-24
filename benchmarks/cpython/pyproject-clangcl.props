@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Additional properties for CPython ClangCL ARM64 builds.
+  Adds -fno-omit-frame-pointer for ETW stack walking compatibility.
+  Place in PCbuild/ directory.
+-->
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+
+  <ItemDefinitionGroup Condition="'$(PlatformToolset)'=='ClangCL'">
+    <ClCompile>
+      <AdditionalOptions>-fno-omit-frame-pointer %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
+  </ItemDefinitionGroup>
+
+</Project>
