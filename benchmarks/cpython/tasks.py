@@ -72,10 +72,11 @@ def patch(c):
 # Build
 # ---------------------------------------------------------------------------
 
-def _build_cmd(toolchain, pgo=False):
+def _build_cmd(toolchain, platform=config.DEFAULT_PLATFORM, pgo=False):
     """Construct the PCbuild/build.bat command."""
+    pinfo = config.platform_info(platform)
     build_bat = CPYTHON_SRC / "PCbuild" / "build.bat"
-    cmd = f'"{build_bat}" -c Release -p ARM64'
+    cmd = f'"{build_bat}" -c Release -p {pinfo["msbuild"]}'
     if pgo:
         cmd += " --pgo"
     if toolchain == "llvm":
@@ -86,8 +87,8 @@ def _build_cmd(toolchain, pgo=False):
     return cmd
 
 
-def _output_dir(toolchain, pgo=False):
-    suffix = f"{toolchain}_pgo" if pgo else toolchain
+def _output_dir(toolchain, platform=config.DEFAULT_PLATFORM, pgo=False):
+    suffix = f"{toolchain}_{platform}_pgo" if pgo else f"{toolchain}_{platform}"
     return BUILD_DIR / suffix
 
 
@@ -95,28 +96,29 @@ def _output_dir(toolchain, pgo=False):
     pre=[patch],
     help={
         "toolchain": "msvc or llvm (default: msvc)",
+        "platform": f"arm64 or x64 (default: {config.DEFAULT_PLATFORM})",
         "pgo": "Enable PGO build (default: False)",
     },
 )
-def build(c, toolchain="msvc", pgo=False):
-    """Build CPython for ARM64 with the specified toolchain."""
-    env = get_toolchain_env(toolchain)
-    cmd = _build_cmd(toolchain, pgo)
+def build(c, toolchain="msvc", platform=config.DEFAULT_PLATFORM, pgo=False):
+    """Build CPython with the specified toolchain and platform."""
+    pinfo = config.platform_info(platform)
+    env = get_toolchain_env(toolchain, platform)
+    cmd = _build_cmd(toolchain, platform, pgo)
 
-    print(f"[cpython] Building ({toolchain}, PGO={pgo})...")
+    print(f"[cpython] Building ({toolchain}/{platform}, PGO={pgo})...")
     subprocess.run(cmd, shell=True, env=env, cwd=str(CPYTHON_SRC), check=True)
 
-    # Copy the built python.exe path info for reference
-    out_dir = _output_dir(toolchain, pgo)
+    out_dir = _output_dir(toolchain, platform, pgo)
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    # CPython outputs to PCbuild/arm64/
-    pcbuild_out = CPYTHON_SRC / "PCbuild" / "arm64"
+    # CPython outputs to PCbuild/<platform>/
+    pcbuild_out = CPYTHON_SRC / "PCbuild" / pinfo["pcbuild"]
     python_exe = pcbuild_out / "python.exe"
     if python_exe.exists():
         # Write a pointer file so bench tasks know where the binary is
         (out_dir / "python_path.txt").write_text(str(python_exe))
-        print(f"[cpython] Build complete ({toolchain}, PGO={pgo}). Binary: {python_exe}")
+        print(f"[cpython] Build complete ({toolchain}/{platform}, PGO={pgo}). Binary: {python_exe}")
     else:
         print(f"[cpython] Warning: python.exe not found at {python_exe}")
         print(f"[cpython] Check PCbuild output in {pcbuild_out}")
@@ -126,17 +128,18 @@ def build(c, toolchain="msvc", pgo=False):
 # Benchmark helpers
 # ---------------------------------------------------------------------------
 
-def _get_python_exe(toolchain, pgo=False):
+def _get_python_exe(toolchain, platform=config.DEFAULT_PLATFORM, pgo=False):
     """Locate the built python.exe for the given config."""
-    out_dir = _output_dir(toolchain, pgo)
+    pinfo = config.platform_info(platform)
+    out_dir = _output_dir(toolchain, platform, pgo)
     pointer = out_dir / "python_path.txt"
     if pointer.exists():
         p = Path(pointer.read_text().strip())
         if p.exists():
             return p
 
-    # Fallback: look in PCbuild/arm64
-    p = CPYTHON_SRC / "PCbuild" / "arm64" / "python.exe"
+    # Fallback: look in PCbuild/<platform>
+    p = CPYTHON_SRC / "PCbuild" / pinfo["pcbuild"] / "python.exe"
     if p.exists():
         return p
     return None
@@ -149,19 +152,20 @@ def _get_python_exe(toolchain, pgo=False):
 @task(
     help={
         "toolchain": "msvc or llvm (default: msvc)",
+        "platform": f"arm64 or x64 (default: {config.DEFAULT_PLATFORM})",
         "pgo": "Use PGO build (default: False)",
     },
 )
-def bench(c, toolchain="msvc", pgo=False):
+def bench(c, toolchain="msvc", platform=config.DEFAULT_PLATFORM, pgo=False):
     """Run pyperformance benchmarks against the built CPython."""
-    python_exe = _get_python_exe(toolchain, pgo)
+    python_exe = _get_python_exe(toolchain, platform, pgo)
     if not python_exe:
-        suffix = f"{toolchain}_pgo" if pgo else toolchain
+        suffix = f"{toolchain}_{platform}_pgo" if pgo else f"{toolchain}_{platform}"
         print(f"[cpython] python.exe not found for {suffix}. Build first.")
         return
 
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
-    suffix = f"{toolchain}_pgo" if pgo else toolchain
+    suffix = f"{toolchain}_{platform}_pgo" if pgo else f"{toolchain}_{platform}"
     result_file = RESULTS_DIR / f"pyperformance_{suffix}.json"
 
     print(f"[cpython] Running pyperformance ({suffix})...")
@@ -181,19 +185,20 @@ def bench(c, toolchain="msvc", pgo=False):
 @task(
     help={
         "toolchain": "msvc or llvm (default: msvc)",
+        "platform": f"arm64 or x64 (default: {config.DEFAULT_PLATFORM})",
         "pgo": "Use PGO build (default: False)",
     },
 )
-def bench_pybench(c, toolchain="msvc", pgo=False):
+def bench_pybench(c, toolchain="msvc", platform=config.DEFAULT_PLATFORM, pgo=False):
     """Run pybench against the built CPython."""
-    python_exe = _get_python_exe(toolchain, pgo)
+    python_exe = _get_python_exe(toolchain, platform, pgo)
     if not python_exe:
-        suffix = f"{toolchain}_pgo" if pgo else toolchain
+        suffix = f"{toolchain}_{platform}_pgo" if pgo else f"{toolchain}_{platform}"
         print(f"[cpython] python.exe not found for {suffix}. Build first.")
         return
 
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
-    suffix = f"{toolchain}_pgo" if pgo else toolchain
+    suffix = f"{toolchain}_{platform}_pgo" if pgo else f"{toolchain}_{platform}"
 
     # pybench.py is shipped with CPython in Tools/pybench/
     pybench_script = CPYTHON_SRC / "Tools" / "pybench" / "pybench.py"
@@ -219,23 +224,24 @@ def bench_pybench(c, toolchain="msvc", pgo=False):
 @task(
     help={
         "toolchain": "msvc or llvm (default: msvc)",
+        "platform": f"arm64 or x64 (default: {config.DEFAULT_PLATFORM})",
         "pgo": "Use PGO build (default: False)",
         "benchmark": "Specific pyperformance benchmark to profile (default: asyncio_websockets)",
     },
 )
-def profile(c, toolchain="msvc", pgo=False, benchmark="asyncio_websockets"):
+def profile(c, toolchain="msvc", platform=config.DEFAULT_PLATFORM, pgo=False, benchmark="asyncio_websockets"):
     """Capture an ETW trace of a specific pyperformance benchmark."""
-    python_exe = _get_python_exe(toolchain, pgo)
+    python_exe = _get_python_exe(toolchain, platform, pgo)
     if not python_exe:
-        suffix = f"{toolchain}_pgo" if pgo else toolchain
+        suffix = f"{toolchain}_{platform}_pgo" if pgo else f"{toolchain}_{platform}"
         print(f"[cpython] python.exe not found for {suffix}. Build first.")
         return
 
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
-    suffix = f"{toolchain}_pgo" if pgo else toolchain
+    suffix = f"{toolchain}_{platform}_pgo" if pgo else f"{toolchain}_{platform}"
     etl_file = RESULTS_DIR / f"cpython_{suffix}_{benchmark}.etl"
 
-    env = get_toolchain_env(toolchain)
+    env = get_toolchain_env(toolchain, platform)
 
     # Run a single benchmark under ETW tracing
     cmd = (

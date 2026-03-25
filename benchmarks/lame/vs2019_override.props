@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  MSBuild property override for LAME builds (ARM64 and x64).
+  Import via /p:ForceImportBeforeCppTargets="path/to/vs2019_override.props"
+-->
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+
+  <!-- Disable optional mpg123 dependency (not included in SVN checkout) -->
+  <PropertyGroup>
+    <HaveMpg123>false</HaveMpg123>
+    <LLVMToolsVersion>22</LLVMToolsVersion>
+  </PropertyGroup>
+
+  <!-- Suppress the mpg123 PreLinkEvent that runs unconditionally -->
+  <ItemDefinitionGroup>
+    <PreLinkEvent>
+      <Command />
+    </PreLinkEvent>
+  </ItemDefinitionGroup>
+
+  <ItemDefinitionGroup>
+    <ClCompile>
+      <!-- Full optimization, fast floating-point, no buffer security checks -->
+      <Optimization>MaxSpeed</Optimization>
+      <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
+      <FloatingPointModel>Fast</FloatingPointModel>
+      <!-- Disable browse info (BSCMAKE) — clang-cl doesn't support .SBR -->
+      <BrowseInformation>false</BrowseInformation>
+      <BufferSecurityCheck>false</BufferSecurityCheck>
+      <WholeProgramOptimization>true</WholeProgramOptimization>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <!-- Suppress NASM-related macros -->
+      <PreprocessorDefinitions>NDEBUG;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+    <Link>
+      <LinkTimeCodeGeneration>UseLinkTimeCodeGeneration</LinkTimeCodeGeneration>
+      <OptimizeReferences>true</OptimizeReferences>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+    </Link>
+    <Lib>
+      <LinkTimeCodeGeneration>true</LinkTimeCodeGeneration>
+    </Lib>
+  </ItemDefinitionGroup>
+
+  <!-- Disable x86/x64-specific ISA options on ARM64 -->
+  <ItemDefinitionGroup Condition="'$(Platform)'=='ARM64'">
+    <ClCompile>
+      <EnableEnhancedInstructionSet />
+    </ClCompile>
+  </ItemDefinitionGroup>
+
+  <!-- When ClangCL toolset is used, add clang-specific flags -->
+  <ItemDefinitionGroup Condition="'$(PlatformToolset)'=='ClangCL'">
+    <ClCompile>
+      <AdditionalOptions>-ffast-math -flto -Wno-incompatible-pointer-types -Wno-implicit-function-declaration %(AdditionalOptions)</AdditionalOptions>
+      <!-- Disable MSVC-specific WPO since we use -flto instead -->
+      <WholeProgramOptimization>false</WholeProgramOptimization>
+    </ClCompile>
+    <Link>
+      <LinkTimeCodeGeneration>Default</LinkTimeCodeGeneration>
+    </Link>
+    <Lib>
+      <LinkTimeCodeGeneration>false</LinkTimeCodeGeneration>
+    </Lib>
+  </ItemDefinitionGroup>
+
+</Project>

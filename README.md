@@ -1,6 +1,6 @@
-# MSVC vs LLVM on Windows ARM64 — Benchmarks
+# MSVC vs LLVM on Windows — Benchmarks
 
-Automated build, benchmark, and profiling framework for comparing MSVC and LLVM (clang-cl) compiler output on Windows ARM64 across five open-source projects.
+Automated build, benchmark, and profiling framework for comparing MSVC and LLVM (clang-cl) compiler output on Windows across five open-source projects. Supports both **x64** and **ARM64** platforms (ARM64 is the primary target).
 
 ## Projects
 
@@ -14,8 +14,8 @@ Automated build, benchmark, and profiling framework for comparing MSVC and LLVM 
 
 ## Prerequisites
 
-- **Windows ARM64** machine (e.g., Qualcomm Cobalt 100)
-- **Visual Studio 2022** with ARM64 C++ workload (MSVC ≥ 14.50)
+- **Windows** machine (x64 or ARM64)
+- **Visual Studio 2022** with C++ workload (MSVC ≥ 14.50); ARM64 tools needed for `--platform=arm64`
 - **LLVM ≥ 21.x** with clang-cl and lld-link
 - **Python 3.x** with pip
 - **Git**, **SVN** (for LAME), **Meson**, **Ninja**, **CMake**
@@ -31,18 +31,25 @@ Automated build, benchmark, and profiling framework for comparing MSVC and LLVM 
 ## Quick start
 
 ```bash
-# 1. Install Python dependencies
+# 1. Create and activate a virtual environment
+python -m venv .venv
+.venv\Scripts\activate
+
+# 2. Install Python dependencies
 pip install -r requirements.txt
 
-# 2. List all available tasks
+# 3. List all available tasks
 inv --list
 
-# 3. Build everything with both toolchains
+# 3. Build everything with both toolchains (x64 for verification)
 inv fetch-all
-inv build-all --toolchain=both
+inv build-all --toolchain=both --platform=x64
+
+# 3b. Or build for ARM64 (primary target)
+#inv build-all --toolchain=both --platform=arm64
 
 # 4. Run all benchmarks
-inv bench-all
+inv bench-all --platform=x64
 
 # 5. Capture ETW profiles
 inv profile-all
@@ -50,13 +57,15 @@ inv profile-all
 
 ## Per-project commands
 
+All build/bench/profile commands accept `--platform=x64` or `--platform=arm64` (default: arm64).
+
 ### LAME MP3
 
 ```bash
 inv lame.fetch                          # SVN checkout r6531
 inv lame.patch                          # Add ARM64 platform + configMS.h fix
-inv lame.build --toolchain=msvc         # Build with MSVC
-inv lame.build --toolchain=llvm         # Build with clang-cl
+inv lame.build --toolchain=msvc --platform=x64   # Build with MSVC for x64
+inv lame.build --toolchain=llvm --platform=arm64  # Build with clang-cl for ARM64
 inv lame.bench --toolchain=msvc         # Benchmark (20 encoding runs)
 inv lame.profile --toolchain=msvc       # ETW CPU sampling trace
 ```
@@ -87,7 +96,7 @@ inv cpython.profile --toolchain=msvc --benchmark=deltablue  # ETW trace
 ### Custom strcmp
 
 ```bash
-inv strcmp.build --toolchain=both       # Build all 4 variants (msvc/llvm × inline/noinline)
+inv strcmp.build --toolchain=both       # Build all 4 variants (msvc/llvm x inline/noinline)
 inv strcmp.bench                        # Run all variants, 3 runs each
 inv strcmp.profile --toolchain=msvc     # ETW trace of inline MSVC variant
 inv strcmp.profile --toolchain=llvm --noinline  # ETW trace of noinline LLVM variant

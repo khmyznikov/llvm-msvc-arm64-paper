@@ -1,0 +1,30 @@
+{
+    "version": 6,
+    "cmakeMinimumRequired": { "major": 3, "minor": 25, "patch": 0 },
+    "configurePresets": [
+        {
+            "name": "llvm-x64-release",
+            "displayName": "LLVM/clang-cl x64 Release (no LTO)",
+            "description": "Ninja generator with clang-cl + lld-link, x64, Release. No LTO, no PGO.",
+            "generator": "Ninja",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release",
+                "CMAKE_C_COMPILER": "clang-cl",
+                "CMAKE_CXX_COMPILER": "clang-cl",
+                "CMAKE_LINKER": "lld-link",
+                "CMAKE_C_FLAGS": "--target=x86_64-pc-windows-msvc",
+                "CMAKE_CXX_FLAGS": "--target=x86_64-pc-windows-msvc",
+                "WITH_CYCLES_CUDA_BINARIES": "OFF",
+                "WITH_CYCLES_HIP_BINARIES": "OFF",
+                "WITH_CYCLES_ONEAPI_BINARIES": "OFF"
+            }
+        }
+    ],
+    "buildPresets": [
+        {
+            "name": "llvm-x64-release",
+            "configurePreset": "llvm-x64-release",
+            "configuration": "Release"
+        }
+    ]
+}

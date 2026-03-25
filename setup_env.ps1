@@ -1,9 +1,9 @@
 <#
 .SYNOPSIS
-    Environment setup and validation for MSVC vs LLVM ARM64 benchmarks.
+    Environment setup and validation for MSVC vs LLVM benchmarks.
 
 .DESCRIPTION
-    Detects and validates required tools: Visual Studio 2022 with ARM64 C++ tools,
+    Detects and validates required tools: Visual Studio 2022 with x64 and ARM64 C++ tools,
     LLVM/clang-cl, Python, Git, SVN, Meson, Ninja, CMake, and Windows Performance Toolkit.
     Optionally installs missing tools via winget with the -Install switch.
 
@@ -14,6 +14,7 @@
     .\setup_env.ps1
     .\setup_env.ps1 -Install
 #>
+#Requires -Version 7.0
 [CmdletBinding()]
 param(
     [switch]$Install
@@ -53,7 +54,25 @@ function Install-IfMissing($name, $wingetId, $present) {
 
 Write-Host ""
 Write-Host "=============================================" -ForegroundColor Cyan
-Write-Host " MSVC vs LLVM ARM64 Benchmark - Env Check"
+Write-Host " MSVC vs LLVM Benchmark - Env Check"
+Write-Host "=============================================" -ForegroundColor Cyan
+
+# Detect host architecture
+$hostArch = [System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture.ToString().ToLower()
+if ($hostArch -eq "arm64") {
+    $primaryPlatform = "arm64"
+    $primaryComponent = "Microsoft.VisualStudio.Component.VC.Tools.ARM64"
+    $primaryVcvarsArg = "arm64"
+    $secondaryPlatform = "x64"
+    $secondaryComponent = "Microsoft.VisualStudio.Component.VC.Tools.x86.x64"
+} else {
+    $primaryPlatform = "x64"
+    $primaryComponent = "Microsoft.VisualStudio.Component.VC.Tools.x86.x64"
+    $primaryVcvarsArg = "x64"
+    $secondaryPlatform = "arm64"
+    $secondaryComponent = "Microsoft.VisualStudio.Component.VC.Tools.ARM64"
+}
+Write-Host " Host: $hostArch  |  Primary: $primaryPlatform  |  Secondary: $secondaryPlatform"
 Write-Host "=============================================" -ForegroundColor Cyan
 Write-Host ""
 
@@ -70,14 +89,14 @@ if (-not (Test-Path $vswhere)) {
 $vsPath = $null
 $msvcVer = $null
 if ($vswhere) {
+    # Check primary platform tools
     $vsPath = & $vswhere -latest -products * `
-        -requires Microsoft.VisualStudio.Component.VC.Tools.ARM64 `
+        -requires $primaryComponent `
         -property installationPath 2>$null | Select-Object -First 1
 
     if ($vsPath) {
         $vcvarsall = Join-Path $vsPath "VC\Auxiliary\Build\vcvarsall.bat"
-        # Get cl.exe version
-        $clVerOutput = cmd /c "`"$vcvarsall`" arm64 >nul 2>&1 && cl.exe 2>&1" 2>&1
+        $clVerOutput = cmd /c "`"$vcvarsall`" $primaryVcvarsArg >nul 2>&1 && cl.exe 2>&1" 2>&1
         $msvcVer = ($clVerOutput | Select-String "Version\s+([\d.]+)" |
                     ForEach-Object { $_.Matches[0].Groups[1].Value }) | Select-Object -First 1
     }
@@ -87,13 +106,25 @@ if ($vsPath -and $msvcVer) {
     $minVer = [version]"14.50"
     $curMajMin = [version]($msvcVer -replace '^(\d+\.\d+).*', '$1')
     if ($curMajMin -ge $minVer) {
-        Write-Status "MSVC (cl.exe)" "OK" "v$msvcVer at $vsPath"
+        Write-Status "MSVC $primaryPlatform (cl.exe)" "OK" "v$msvcVer at $vsPath"
     } else {
-        Write-Status "MSVC (cl.exe)" "WARN" "v$msvcVer found (need >= 14.50)"
+        Write-Status "MSVC $primaryPlatform (cl.exe)" "WARN" "v$msvcVer found (need >= 14.50)"
     }
 } else {
-    Write-Status "MSVC ARM64 tools" "MISS" "Visual Studio 2022 with ARM64 C++ workload required"
+    Write-Status "MSVC $primaryPlatform tools" "MISS" "Visual Studio 2022 with $primaryPlatform C++ workload required"
     Install-IfMissing "Visual Studio Build Tools" "Microsoft.VisualStudio.2022.BuildTools" $false
+}
+
+# Check secondary platform tools (optional)
+if ($vswhere) {
+    $vsPathSecondary = & $vswhere -latest -products * `
+        -requires $secondaryComponent `
+        -property installationPath 2>$null | Select-Object -First 1
+    if ($vsPathSecondary) {
+        Write-Status "MSVC $secondaryPlatform tools" "OK" "$secondaryPlatform C++ workload installed"
+    } else {
+        Write-Status "MSVC $secondaryPlatform tools" "WARN" "Not installed — needed for --platform=$secondaryPlatform"
+    }
 }
 
 # -----------------------------------------------------------------------
@@ -185,8 +216,8 @@ if ($svnOk) {
     $svnVer = ((svn --version --quiet 2>&1) | Select-Object -First 1)
     Write-Status "SVN" "OK" "v$svnVer"
 } else {
-    Write-Status "SVN" "WARN" "Needed for LAME checkout"
-    Install-IfMissing "TortoiseSVN (CLI)" "TortoiseSVN.TortoiseSVN" $false
+    Write-Status "SVN" "MISS" "Required for LAME checkout"
+    Install-IfMissing "SlikSVN (CLI)" "Slik.Subversion" $false
 }
 
 # -----------------------------------------------------------------------

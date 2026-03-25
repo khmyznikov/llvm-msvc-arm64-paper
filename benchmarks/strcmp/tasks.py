@@ -24,9 +24,9 @@ RESULTS_DIR = config.RESULTS_DIR / "strcmp"
 # Build
 # ---------------------------------------------------------------------------
 
-def _build_msvc(env, noinline=False):
+def _build_msvc(env, platform, noinline=False):
     """Build with MSVC cl.exe."""
-    suffix = "msvc_noinline" if noinline else "msvc"
+    suffix = f"msvc_{platform}_noinline" if noinline else f"msvc_{platform}"
     out_exe = BUILD_DIR / f"strcmp_{suffix}.exe"
     BUILD_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -40,9 +40,9 @@ def _build_msvc(env, noinline=False):
     return out_exe
 
 
-def _build_llvm(env, noinline=False):
+def _build_llvm(env, platform, noinline=False):
     """Build with clang-cl."""
-    suffix = "llvm_noinline" if noinline else "llvm"
+    suffix = f"llvm_{platform}_noinline" if noinline else f"llvm_{platform}"
     out_exe = BUILD_DIR / f"strcmp_{suffix}.exe"
     BUILD_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -60,26 +60,27 @@ def _build_llvm(env, noinline=False):
 @task(
     help={
         "toolchain": "msvc, llvm, or both (default: msvc)",
+        "platform": f"arm64 or x64 (default: {config.DEFAULT_PLATFORM})",
         "noinline": "Build noinline variant (default: False)",
     },
 )
-def build(c, toolchain="msvc", noinline=False):
-    """Build the strcmp benchmark for ARM64."""
+def build(c, toolchain="msvc", platform=config.DEFAULT_PLATFORM, noinline=False):
+    """Build the strcmp benchmark."""
     if toolchain == "both":
         for tc in ["msvc", "llvm"]:
-            env = get_toolchain_env(tc)
+            env = get_toolchain_env(tc, platform)
             if tc == "msvc":
-                _build_msvc(env, noinline=False)
-                _build_msvc(env, noinline=True)
+                _build_msvc(env, platform, noinline=False)
+                _build_msvc(env, platform, noinline=True)
             else:
-                _build_llvm(env, noinline=False)
-                _build_llvm(env, noinline=True)
+                _build_llvm(env, platform, noinline=False)
+                _build_llvm(env, platform, noinline=True)
     else:
-        env = get_toolchain_env(toolchain)
+        env = get_toolchain_env(toolchain, platform)
         if toolchain == "msvc":
-            _build_msvc(env, noinline=noinline)
+            _build_msvc(env, platform, noinline=noinline)
         else:
-            _build_llvm(env, noinline=noinline)
+            _build_llvm(env, platform, noinline=noinline)
 
 
 # ---------------------------------------------------------------------------
@@ -87,19 +88,22 @@ def build(c, toolchain="msvc", noinline=False):
 # ---------------------------------------------------------------------------
 
 @task(
-    help={"toolchain": "msvc, llvm, or both (default: both)"},
+    help={
+        "toolchain": "msvc, llvm, or both (default: both)",
+        "platform": f"arm64 or x64 (default: {config.DEFAULT_PLATFORM})",
+    },
 )
-def bench(c, toolchain="both"):
+def bench(c, toolchain="both", platform=config.DEFAULT_PLATFORM):
     """Run the strcmp benchmark (all variants: inline + noinline)."""
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
     toolchains = ["msvc", "llvm"] if toolchain == "both" else [toolchain]
 
     results = {}
     for tc in toolchains:
-        for noinline_label, suffix in [("inline", tc), ("noinline", f"{tc}_noinline")]:
+        for noinline_label, suffix in [("inline", f"{tc}_{platform}"), ("noinline", f"{tc}_{platform}_noinline")]:
             exe = BUILD_DIR / f"strcmp_{suffix}.exe"
             if not exe.exists():
-                print(f"[strcmp] {exe.name} not found. Run 'inv strcmp.build --toolchain={tc}' first.")
+                print(f"[strcmp] {exe.name} not found. Run 'inv strcmp.build --toolchain={tc} --platform={platform}' first.")
                 continue
 
             print(f"[strcmp] Running {exe.name}...")
@@ -119,7 +123,7 @@ def bench(c, toolchain="both"):
             print(f"  {key}: {wall_time:.1f}s total")
             print(result.stdout)
 
-    result_file = RESULTS_DIR / "strcmp_results.json"
+    result_file = RESULTS_DIR / f"strcmp_results_{platform}.json"
     result_file.write_text(json.dumps(results, indent=2))
     print(f"[strcmp] Results: {result_file}")
 
@@ -131,12 +135,13 @@ def bench(c, toolchain="both"):
 @task(
     help={
         "toolchain": "msvc or llvm (default: msvc)",
+        "platform": f"arm64 or x64 (default: {config.DEFAULT_PLATFORM})",
         "noinline": "Profile noinline variant (default: False)",
     },
 )
-def profile(c, toolchain="msvc", noinline=False):
+def profile(c, toolchain="msvc", platform=config.DEFAULT_PLATFORM, noinline=False):
     """Capture an ETW trace of the strcmp benchmark."""
-    suffix = f"{toolchain}_noinline" if noinline else toolchain
+    suffix = f"{toolchain}_{platform}_noinline" if noinline else f"{toolchain}_{platform}"
     exe = BUILD_DIR / f"strcmp_{suffix}.exe"
     if not exe.exists():
         print(f"[strcmp] {exe.name} not found. Build first.")
@@ -144,7 +149,7 @@ def profile(c, toolchain="msvc", noinline=False):
 
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
     etl_file = RESULTS_DIR / f"strcmp_{suffix}.etl"
-    env = get_toolchain_env(toolchain)
+    env = get_toolchain_env(toolchain, platform)
 
     profile_command([str(exe)], output_etl=etl_file, env=env)
     print(f"[strcmp] Profile saved: {etl_file}")
