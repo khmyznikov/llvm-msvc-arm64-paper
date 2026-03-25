@@ -1,7 +1,9 @@
 """Invoke tasks for NumPy count_nonzero benchmark."""
 
 import json
+import os
 import subprocess
+import sys
 import time
 from pathlib import Path
 
@@ -54,6 +56,9 @@ def fetch(c):
 def build(c, toolchain="msvc", platform=config.DEFAULT_PLATFORM):
     """Build NumPy with the specified toolchain via Meson."""
     env = get_toolchain_env(toolchain, platform)
+    # Merge current process PATH so venv tools (python, cython) are available
+    current_path = os.environ.get("PATH", "")
+    env["PATH"] = env.get("PATH", "") + ";" + current_path
     build_dir = BUILD_DIR / f"{toolchain}_{platform}"
     tc_prefix = "msvc" if toolchain == "msvc" else "clang"
     native_file = NATIVE_DIR / f"native-{tc_prefix}-{platform}.ini"
@@ -64,20 +69,24 @@ def build(c, toolchain="msvc", platform=config.DEFAULT_PLATFORM):
         import shutil
         shutil.rmtree(str(build_dir))
 
+    # NumPy ships a vendored Meson with custom modules (e.g. meson_cpu/features)
+    vendored_meson = NUMPY_SRC / "vendored-meson" / "meson" / "meson.py"
+    meson_cmd = f'python "{vendored_meson}"' if vendored_meson.exists() else "meson"
+
     # Meson setup
     setup_cmd = (
-        f'meson setup "{build_dir}" "{NUMPY_SRC}" '
+        f'{meson_cmd} setup "{build_dir}" "{NUMPY_SRC}" '
         f'--native-file "{native_file}" '
         f'--prefix "{build_dir / "install"}"'
     )
     subprocess.run(setup_cmd, shell=True, env=env, check=True)
 
     # Meson compile
-    compile_cmd = f'meson compile -C "{build_dir}"'
+    compile_cmd = f'{meson_cmd} compile -C "{build_dir}"'
     subprocess.run(compile_cmd, shell=True, env=env, check=True)
 
     # Meson install (to get a usable numpy package)
-    install_cmd = f'meson install -C "{build_dir}"'
+    install_cmd = f'{meson_cmd} install -C "{build_dir}"'
     subprocess.run(install_cmd, shell=True, env=env, check=True)
 
     print(f"[numpy] Build complete ({toolchain}/{platform}). Output: {build_dir}")
@@ -92,6 +101,9 @@ import numpy as np
 import time
 import json
 import sys
+
+# Verify which numpy is loaded
+print(f"numpy: {{np.__file__}}", file=sys.stderr)
 
 size = {size}
 runs = 50
@@ -137,9 +149,11 @@ def bench(c, toolchain="msvc", platform=config.DEFAULT_PLATFORM):
         return
 
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
-    env = get_toolchain_env(toolchain, platform)
 
-    # Add the built numpy to PYTHONPATH
+    # For benchmarking we use the current process env (venv python),
+    # not the compiler toolchain env — we just need PYTHONPATH
+    env = os.environ.copy()
+
     # Find the site-packages directory under install
     site_pkgs = None
     for sp in install_dir.rglob("numpy"):
@@ -148,12 +162,19 @@ def bench(c, toolchain="msvc", platform=config.DEFAULT_PLATFORM):
             break
     if site_pkgs:
         env["PYTHONPATH"] = str(site_pkgs)
+    else:
+        print(f"[numpy] Warning: numpy not found under {install_dir}")
 
     script = _BENCH_SCRIPT.format(size=config.NUMPY_BENCH_SIZE)
     result = subprocess.run(
-        ["python", "-c", script],
+        [sys.executable, "-c", script],
         capture_output=True, text=True, env=env, check=True,
     )
+
+    # Show which numpy was loaded
+    if result.stderr:
+        for line in result.stderr.strip().splitlines():
+            print(f"[numpy] {line}")
 
     # Parse JSON output from the script
     for line in result.stdout.strip().splitlines():

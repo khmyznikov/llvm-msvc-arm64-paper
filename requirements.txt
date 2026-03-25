@@ -1,3 +1,6 @@
 invoke>=2.2
 pyperf>=2.7
 pyperformance>=1.11
+meson>=1.5
+ninja>=1.11
+cython>=3.0
