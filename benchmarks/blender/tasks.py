@@ -204,6 +204,7 @@ def bench(c, toolchain="msvc", platform=config.DEFAULT_PLATFORM):
     result_file = RESULTS_DIR / f"blender_{toolchain}_{platform}.json"
     result_data = {
         "benchmark": "blender_render",
+        "machine": config.get_machine_info(),
         "toolchain": toolchain,
         "platform": platform,
         "scenes": results,

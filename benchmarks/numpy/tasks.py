@@ -192,6 +192,7 @@ def bench(c, toolchain="msvc", platform=config.DEFAULT_PLATFORM):
             data = json.loads(line)
             data["toolchain"] = toolchain
             data["platform"] = platform
+            data["machine"] = config.get_machine_info()
             result_file = RESULTS_DIR / f"numpy_{toolchain}_{platform}.json"
             result_file.write_text(json.dumps(data, indent=2))
             print(f"[numpy] Benchmark complete ({toolchain}). Mean: {data['mean_sec']*1e6:.1f}µs")

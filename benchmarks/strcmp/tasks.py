@@ -126,7 +126,12 @@ def bench(c, toolchain="both", platform=config.DEFAULT_PLATFORM):
             print(result.stdout)
 
     result_file = RESULTS_DIR / f"strcmp_results_{platform}.json"
-    result_file.write_text(json.dumps(results, indent=2))
+    result_data = {
+        "machine": config.get_machine_info(),
+        "platform": platform,
+        "results": results,
+    }
+    result_file.write_text(json.dumps(result_data, indent=2))
     print(f"[strcmp] Results: {result_file}")
 
 

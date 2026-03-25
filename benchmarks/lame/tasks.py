@@ -343,25 +343,33 @@ def bench(c, toolchain="msvc", platform=config.DEFAULT_PLATFORM, runs=config.LAM
     wav_file = _ensure_wav()
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
 
-    encode_args = (
-        f'"{lame_exe}" {" ".join(config.LAME_EXTRA_FLAGS)} '
-        f'--preset {config.LAME_PRESET} "{wav_file}"'
-    )
+    lame_cmd = [
+        str(lame_exe),
+        *config.LAME_EXTRA_FLAGS,
+        "--preset", config.LAME_PRESET,
+        str(wav_file),
+    ]
 
     # Warmup run (prime disk cache, DLL loads)
     warmup_mp3 = out_dir / "bench_warmup.mp3"
     subprocess.run(
-        f'{encode_args} "{warmup_mp3}"',
-        shell=True, check=True, capture_output=True,
+        lame_cmd + [str(warmup_mp3)],
+        check=True, capture_output=True,
     )
     warmup_mp3.unlink(missing_ok=True)
+
+    # Set HIGH priority + CPU affinity for the parent process;
+    # child processes inherit these settings.
+    config.set_bench_priority()
 
     results = []
     for i in range(1, runs + 1):
         out_mp3 = out_dir / f"bench_output_{i}.mp3"
-        bench_cmd = f'{config.START_TEMPLATE} {encode_args} "{out_mp3}"'
         start = time.perf_counter()
-        subprocess.run(bench_cmd, shell=True, check=True, capture_output=True)
+        subprocess.run(
+            lame_cmd + [str(out_mp3)],
+            check=True, capture_output=True,
+        )
         elapsed = time.perf_counter() - start
         results.append(elapsed)
         out_mp3.unlink(missing_ok=True)
@@ -370,6 +378,7 @@ def bench(c, toolchain="msvc", platform=config.DEFAULT_PLATFORM, runs=config.LAM
     result_file = RESULTS_DIR / f"lame_{toolchain}_{platform}.json"
     result_data = {
         "benchmark": "lame_mp3",
+        "machine": config.get_machine_info(),
         "toolchain": toolchain,
         "platform": platform,
         "runs": runs,

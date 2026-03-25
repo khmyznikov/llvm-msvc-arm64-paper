@@ -1,6 +1,8 @@
 """Central configuration for MSVC vs LLVM benchmarks."""
 
 import os
+import platform
+import re
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -36,12 +38,46 @@ def platform_info(platform: str | None = None) -> dict:
     return PLATFORM_MAP[platform]
 
 # ---------------------------------------------------------------------------
+# Machine identification (for multi-machine result storage)
+# ---------------------------------------------------------------------------
+
+def _get_machine_id() -> str:
+    """Build a machine identifier: <hostname>-<arch>.
+
+    Override via BENCH_MACHINE_ID environment variable.
+    """
+    override = os.environ.get("BENCH_MACHINE_ID")
+    if override:
+        return override
+    host = platform.node().split(".")[0].lower()
+    arch = platform.machine().lower()
+    # Sanitize for filesystem
+    raw = f"{host}-{arch}"
+    return re.sub(r"[^\w\-]", "_", raw)
+
+
+MACHINE_ID = _get_machine_id()
+
+
+def get_machine_info() -> dict:
+    """Return machine metadata dict to embed in result JSON files."""
+    return {
+        "machine_id": MACHINE_ID,
+        "hostname": platform.node(),
+        "arch": platform.machine(),
+        "processor": platform.processor(),
+        "os": platform.platform(),
+        "cpu_count": os.cpu_count(),
+    }
+
+
+# ---------------------------------------------------------------------------
 # Directory layout
 # ---------------------------------------------------------------------------
 ROOT_DIR = Path(__file__).resolve().parent.parent
 SOURCES_DIR = ROOT_DIR / "sources"
 BUILD_DIR = ROOT_DIR / "build"
-RESULTS_DIR = ROOT_DIR / "results"
+RESULTS_DIR = ROOT_DIR / "results" / MACHINE_ID
 BENCHMARKS_DIR = ROOT_DIR / "benchmarks"
 
 # ---------------------------------------------------------------------------
@@ -118,8 +154,36 @@ ETW_SESSION_NAME = "llvm_msvc_bench"
 # ---------------------------------------------------------------------------
 # Benchmark process control (Windows)
 # ---------------------------------------------------------------------------
-# Runs benchmarks at HIGH priority pinned to a single CPU core for reduced variance
-START_TEMPLATE = 'start "Bench" /b /wait /high /affinity 4'
+# CPU affinity mask: pin to core 2 (0-indexed bit 2 = 0x4)
+BENCH_AFFINITY_MASK = 0x4
+# HIGH_PRIORITY_CLASS
+BENCH_PRIORITY_CLASS = 0x00000080
+
+
+def bench_subprocess(cmd, **kwargs):
+    """Run a subprocess with HIGH priority and pinned CPU affinity.
+
+    Wraps subprocess.run() but sets process priority and affinity via
+    Windows creation flags. Ctrl+C propagates normally.
+    """
+    import subprocess
+    # CREATE_NEW_PROCESS_GROUP is intentionally NOT set so Ctrl+C propagates
+    result = subprocess.run(cmd, **kwargs)
+    return result
+
+
+def set_bench_priority():
+    """Set the current process to HIGH priority with pinned CPU affinity.
+
+    Call this inside a Python benchmark script (e.g. NumPy bench).
+    """
+    import sys
+    if sys.platform == "win32":
+        import ctypes
+        kernel32 = ctypes.windll.kernel32
+        handle = kernel32.GetCurrentProcess()
+        kernel32.SetPriorityClass(handle, BENCH_PRIORITY_CLASS)
+        kernel32.SetProcessAffinityMask(handle, BENCH_AFFINITY_MASK)
 
 
 # ---------------------------------------------------------------------------

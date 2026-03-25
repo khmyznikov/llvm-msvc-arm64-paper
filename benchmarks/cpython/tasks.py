@@ -208,13 +208,14 @@ def bench(c, toolchain="msvc", platform=config.DEFAULT_PLATFORM, pgo=False):
     result_file = RESULTS_DIR / f"pyperformance_{suffix}.json"
 
     print(f"[cpython] Running pyperformance ({suffix})...")
-    cmd = (
-        f'{config.START_TEMPLATE} pyperformance run '
-        f'--python="{python_exe}" '
-        f'--rigorous '
-        f'--output="{result_file}"'
-    )
-    subprocess.run(cmd, shell=True, check=True)
+    config.set_bench_priority()
+    cmd = [
+        "pyperformance", "run",
+        f"--python={python_exe}",
+        "--rigorous",
+        f"--output={result_file}",
+    ]
+    subprocess.run(cmd, check=True)
     print(f"[cpython] pyperformance complete. Results: {result_file}")
 
 
@@ -252,8 +253,11 @@ def bench_pybench(c, toolchain="msvc", platform=config.DEFAULT_PLATFORM, pgo=Fal
         return
 
     result_file = RESULTS_DIR / f"pybench_{suffix}.txt"
-    cmd = f'{config.START_TEMPLATE} "{python_exe}" "{pybench_script}" -f "{result_file}"'
-    subprocess.run(cmd, shell=True, check=True)
+    config.set_bench_priority()
+    subprocess.run(
+        [str(python_exe), str(pybench_script), "-f", str(result_file)],
+        check=True,
+    )
     print(f"[cpython] pybench complete. Results: {result_file}")
 
 
