@@ -47,7 +47,7 @@ def fetch(c):
 
 @task(pre=[fetch])
 def patch(c):
-    """Copy profiling support files into CPython PCbuild/."""
+    """Apply profiling support patches to CPython PCbuild/."""
     marker = CPYTHON_SRC / ".bench_patched"
     if marker.exists():
         print("[cpython] Already patched.")
@@ -55,14 +55,41 @@ def patch(c):
 
     pcbuild = CPYTHON_SRC / "PCbuild"
 
-    # Copy msbuild.rsp for frame pointer support
+    # Copy msbuild.rsp for frame pointer / debug info support
     shutil.copy2(str(ASSETS_DIR / "msbuild.rsp"), str(pcbuild / "msbuild.rsp"))
 
-    # Copy clang-cl props for frame pointer support
-    shutil.copy2(
-        str(ASSETS_DIR / "pyproject-clangcl.props"),
-        str(pcbuild / "pyproject-clangcl.props"),
-    )
+    # Patch upstream pyproject-clangcl.props in-place:
+    # - add -clang:-fno-omit-frame-pointer for ETW stack walking
+    # - add -Wno-incompatible-pointer-types for Clang 21+ compat (socketmodule.c)
+    clangcl_props = pcbuild / "pyproject-clangcl.props"
+    if clangcl_props.exists():
+        text = clangcl_props.read_text(encoding="utf-8")
+        modified = False
+
+        # Add frame pointer flag (using -clang: prefix for clang-cl)
+        frame_ptr_flag = "-clang:-fno-omit-frame-pointer"
+        if frame_ptr_flag not in text:
+            # Append to the first unconditional AdditionalOptions line
+            text = text.replace(
+                "-Wno-unused-function %(AdditionalOptions)",
+                f"-Wno-unused-function {frame_ptr_flag} %(AdditionalOptions)",
+            )
+            modified = True
+
+        # Suppress -Wincompatible-pointer-types (Clang 21+ treats as error)
+        # Note: upstream has -Wno-incompatible-pointer-types-discards-qualifiers
+        # which is a *different* warning — we need the broader one too
+        incompat_flag = "-Wno-incompatible-pointer-types "
+        if incompat_flag not in text:
+            text = text.replace(
+                "-Wno-incompatible-pointer-types-discards-qualifiers",
+                f"-Wno-incompatible-pointer-types-discards-qualifiers {incompat_flag}",
+            )
+            modified = True
+
+        if modified:
+            clangcl_props.write_text(text, encoding="utf-8")
+            print("[cpython] Patched pyproject-clangcl.props: frame pointers + clang 21 compat")
 
     marker.write_text("patched")
     print("[cpython] Profiling patches applied to PCbuild/.")
@@ -84,6 +111,12 @@ def _build_cmd(toolchain, platform=config.DEFAULT_PLATFORM, pgo=False):
         llvm_dir = clangcl.parent.parent  # e.g. C:\Program Files\LLVM
         cmd += f' "/p:PlatformToolset=ClangCL"'
         cmd += f' "/p:LLVMInstallDir={llvm_dir}"'
+        # Auto-detect LLVM tools version
+        lib_clang = Path(str(llvm_dir)) / "lib" / "clang"
+        if lib_clang.exists():
+            versions = sorted(lib_clang.iterdir(), reverse=True)
+            if versions:
+                cmd += f' "/p:LLVMToolsVersion={versions[0].name}"'
     return cmd
 
 
@@ -109,19 +142,25 @@ def build(c, toolchain="msvc", platform=config.DEFAULT_PLATFORM, pgo=False):
     print(f"[cpython] Building ({toolchain}/{platform}, PGO={pgo})...")
     subprocess.run(cmd, shell=True, env=env, cwd=str(CPYTHON_SRC), check=True)
 
-    out_dir = _output_dir(toolchain, platform, pgo)
-    out_dir.mkdir(parents=True, exist_ok=True)
-
     # CPython outputs to PCbuild/<platform>/
     pcbuild_out = CPYTHON_SRC / "PCbuild" / pinfo["pcbuild"]
     python_exe = pcbuild_out / "python.exe"
-    if python_exe.exists():
-        # Write a pointer file so bench tasks know where the binary is
-        (out_dir / "python_path.txt").write_text(str(python_exe))
-        print(f"[cpython] Build complete ({toolchain}/{platform}, PGO={pgo}). Binary: {python_exe}")
-    else:
+    if not python_exe.exists():
         print(f"[cpython] Warning: python.exe not found at {python_exe}")
         print(f"[cpython] Check PCbuild output in {pcbuild_out}")
+        return
+
+    # Create a proper installation via PC.layout (standalone binary layout)
+    out_dir = _output_dir(toolchain, platform, pgo)
+    if out_dir.exists():
+        shutil.rmtree(out_dir)
+    print(f"[cpython] Creating layout installation at {out_dir}...")
+    subprocess.run(
+        f'"{python_exe}" -m PC.layout --preset-default --copy "{out_dir}" -v',
+        shell=True, env=env, cwd=str(CPYTHON_SRC), check=True,
+    )
+
+    print(f"[cpython] Build complete ({toolchain}/{platform}, PGO={pgo}). Install: {out_dir}")
 
 
 # ---------------------------------------------------------------------------
@@ -130,15 +169,15 @@ def build(c, toolchain="msvc", platform=config.DEFAULT_PLATFORM, pgo=False):
 
 def _get_python_exe(toolchain, platform=config.DEFAULT_PLATFORM, pgo=False):
     """Locate the built python.exe for the given config."""
-    pinfo = config.platform_info(platform)
     out_dir = _output_dir(toolchain, platform, pgo)
-    pointer = out_dir / "python_path.txt"
-    if pointer.exists():
-        p = Path(pointer.read_text().strip())
-        if p.exists():
-            return p
+
+    # Prefer the PC.layout installation
+    p = out_dir / "python.exe"
+    if p.exists():
+        return p
 
     # Fallback: look in PCbuild/<platform>
+    pinfo = config.platform_info(platform)
     p = CPYTHON_SRC / "PCbuild" / pinfo["pcbuild"] / "python.exe"
     if p.exists():
         return p
@@ -170,8 +209,9 @@ def bench(c, toolchain="msvc", platform=config.DEFAULT_PLATFORM, pgo=False):
 
     print(f"[cpython] Running pyperformance ({suffix})...")
     cmd = (
-        f'pyperformance run '
+        f'{config.START_TEMPLATE} pyperformance run '
         f'--python="{python_exe}" '
+        f'--rigorous '
         f'--output="{result_file}"'
     )
     subprocess.run(cmd, shell=True, check=True)
@@ -212,7 +252,7 @@ def bench_pybench(c, toolchain="msvc", platform=config.DEFAULT_PLATFORM, pgo=Fal
         return
 
     result_file = RESULTS_DIR / f"pybench_{suffix}.txt"
-    cmd = f'"{python_exe}" "{pybench_script}" -f "{result_file}"'
+    cmd = f'{config.START_TEMPLATE} "{python_exe}" "{pybench_script}" -f "{result_file}"'
     subprocess.run(cmd, shell=True, check=True)
     print(f"[cpython] pybench complete. Results: {result_file}")
 

@@ -22,6 +22,7 @@ LAME_SRC = config.SOURCES_DIR / "lame"
 LAME_SLN = LAME_SRC / "vc_solution" / "vs2019_lame.sln"
 BENCH_DIR = config.BUILD_DIR / "lame"
 RESULTS_DIR = config.RESULTS_DIR / "lame"
+BUILD_LOGS_DIR = config.ROOT_DIR / "build-logs" / "lame"
 PATCHES_DIR = Path(__file__).resolve().parent / "patches"
 OVERRIDE_PROPS = Path(__file__).resolve().parent / "vs2019_override.props"
 
@@ -249,7 +250,29 @@ def build(c, toolchain="msvc", platform=config.DEFAULT_PLATFORM):
         f'/p:OutDir="{out_dir}\\\\" '
         f'/m /v:minimal'
     )
-    subprocess.run(cmd, shell=True, env=env, check=True)
+
+    # Capture build log
+    BUILD_LOGS_DIR.mkdir(parents=True, exist_ok=True)
+    ts = config.make_timestamp()
+    log_file = BUILD_LOGS_DIR / f"{toolchain}_{platform}-build-{ts}.txt"
+
+    result = subprocess.run(cmd, shell=True, env=env, capture_output=True, text=True)
+    log_file.write_text(
+        f"Command: {cmd}\nExit code: {result.returncode}\n\n"
+        f"=== STDOUT ===\n{result.stdout}\n=== STDERR ===\n{result.stderr}",
+        encoding="utf-8",
+    )
+    if result.returncode != 0:
+        print(f"[lame] Build failed! See: {log_file}")
+        print(result.stderr[-1000:] if len(result.stderr) > 1000 else result.stderr)
+        raise SystemExit(1)
+
+    # Copy PDB for profiling/debugging
+    lame_pdb = out_dir / "lame.pdb"
+    if not lame_pdb.exists():
+        for pdb in out_dir.glob("*.pdb"):
+            break  # at least one PDB present
+
     print(f"[lame] Build complete ({toolchain}/{platform}). Output: {out_dir}")
 
 
@@ -319,21 +342,29 @@ def bench(c, toolchain="msvc", platform=config.DEFAULT_PLATFORM, runs=config.LAM
 
     wav_file = _ensure_wav()
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
-    results = []
 
+    encode_args = (
+        f'"{lame_exe}" {" ".join(config.LAME_EXTRA_FLAGS)} '
+        f'--preset {config.LAME_PRESET} "{wav_file}"'
+    )
+
+    # Warmup run (prime disk cache, DLL loads)
+    warmup_mp3 = out_dir / "bench_warmup.mp3"
+    subprocess.run(
+        f'{encode_args} "{warmup_mp3}"',
+        shell=True, check=True, capture_output=True,
+    )
+    warmup_mp3.unlink(missing_ok=True)
+
+    results = []
     for i in range(1, runs + 1):
         out_mp3 = out_dir / f"bench_output_{i}.mp3"
+        bench_cmd = f'{config.START_TEMPLATE} {encode_args} "{out_mp3}"'
         start = time.perf_counter()
-        subprocess.run(
-            [str(lame_exe), "--preset", config.LAME_PRESET, str(wav_file), str(out_mp3)],
-            check=True,
-            capture_output=True,
-        )
+        subprocess.run(bench_cmd, shell=True, check=True, capture_output=True)
         elapsed = time.perf_counter() - start
         results.append(elapsed)
-        # Clean up output
-        if out_mp3.exists():
-            out_mp3.unlink()
+        out_mp3.unlink(missing_ok=True)
         print(f"  Run {i}/{runs}: {elapsed:.3f}s")
 
     result_file = RESULTS_DIR / f"lame_{toolchain}_{platform}.json"
@@ -377,11 +408,14 @@ def profile(c, toolchain="msvc", platform=config.DEFAULT_PLATFORM):
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
 
     env = get_toolchain_env(toolchain, platform)
-    profile_command(
-        [str(lame_exe), "--preset", config.LAME_PRESET, str(wav_file), str(out_mp3)],
-        output_etl=etl_file,
-        env=env,
-    )
+
+    lame_cmd = [
+        str(lame_exe),
+        *config.LAME_EXTRA_FLAGS,
+        "--preset", config.LAME_PRESET,
+        str(wav_file), str(out_mp3),
+    ]
+    profile_command(lame_cmd, output_etl=etl_file, env=env)
     if out_mp3.exists():
         out_mp3.unlink()
     print(f"[lame] Profile saved: {etl_file}")

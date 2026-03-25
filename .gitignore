@@ -7,10 +7,6 @@ sources/
 *.exp
 *.lib
 
-# Results (keep .gitkeep)
-results/*
-!results/.gitkeep
-
 # Python
 __pycache__/
 *.pyc

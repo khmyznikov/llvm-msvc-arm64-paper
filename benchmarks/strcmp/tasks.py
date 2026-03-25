@@ -32,8 +32,9 @@ def _build_msvc(env, platform, noinline=False):
 
     defines = "/DNOINLINE" if noinline else ""
     cmd = (
-        f'cl /O2 /GL /fp:fast /GS- {defines} '
-        f'"{SRC_FILE}" /Fe:"{out_exe}" /link /LTCG'
+        f'cl /O2 /GL /fp:fast /GS- /Zi /Zo /Oy- {defines} '
+        f'"{SRC_FILE}" /Fe:"{out_exe}" '
+        f'/link /LTCG /OPT:REF /OPT:ICF /INCREMENTAL:NO /DEBUG /DEBUGTYPE:FIXUP,CV'
     )
     subprocess.run(cmd, shell=True, env=env, check=True)
     print(f"[strcmp] Built {out_exe.name}")
@@ -49,8 +50,9 @@ def _build_llvm(env, platform, noinline=False):
     clangcl = find_clangcl()
     defines = "-DNOINLINE" if noinline else ""
     cmd = (
-        f'"{clangcl}" -O3 -flto /clang:-ffast-math /GS- {defines} '
-        f'"{SRC_FILE}" -o "{out_exe}" -fuse-ld=lld'
+        f'"{clangcl}" -O3 -flto /clang:-ffast-math /GS- /Zi /Zo /Oy- {defines} '
+        f'"{SRC_FILE}" -o "{out_exe}" -fuse-ld=lld '
+        f'/link /LTCG /OPT:REF /OPT:ICF /INCREMENTAL:NO /DEBUG /DEBUGTYPE:FIXUP,CV'
     )
     subprocess.run(cmd, shell=True, env=env, check=True)
     print(f"[strcmp] Built {out_exe.name}")

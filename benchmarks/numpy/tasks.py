@@ -101,6 +101,15 @@ import numpy as np
 import time
 import json
 import sys
+import os
+
+# Set high priority and CPU affinity for reduced variance
+if sys.platform == "win32":
+    import ctypes
+    kernel32 = ctypes.windll.kernel32
+    handle = kernel32.GetCurrentProcess()
+    kernel32.SetPriorityClass(handle, 0x00000080)  # HIGH_PRIORITY_CLASS
+    kernel32.SetProcessAffinityMask(handle, 0x4)   # Pin to core 2
 
 # Verify which numpy is loaded
 print(f"numpy: {{np.__file__}}", file=sys.stderr)

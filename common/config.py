@@ -1,6 +1,7 @@
 """Central configuration for MSVC vs LLVM benchmarks."""
 
 import os
+from datetime import datetime, timezone
 from pathlib import Path
 
 # ---------------------------------------------------------------------------
@@ -95,6 +96,7 @@ CLANGCL_LINK_FLAGS = ["-fuse-ld=lld"]
 # ---------------------------------------------------------------------------
 LAME_BENCH_RUNS = 20
 LAME_PRESET = "extreme"
+LAME_EXTRA_FLAGS = ["-h", "-V", "0", "--silent"]  # High-quality VBR, suppress I/O
 
 NUMPY_BENCH_SIZE = 1_000_000
 NUMPY_BENCH_NUMAXES = 1
@@ -112,3 +114,18 @@ BLENDER_SCENES = [
 # Profiling
 # ---------------------------------------------------------------------------
 ETW_SESSION_NAME = "llvm_msvc_bench"
+
+# ---------------------------------------------------------------------------
+# Benchmark process control (Windows)
+# ---------------------------------------------------------------------------
+# Runs benchmarks at HIGH priority pinned to a single CPU core for reduced variance
+START_TEMPLATE = 'start "Bench" /b /wait /high /affinity 4'
+
+
+# ---------------------------------------------------------------------------
+# Utilities
+# ---------------------------------------------------------------------------
+
+def make_timestamp() -> str:
+    """Return a UTC timestamp string suitable for filenames."""
+    return datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")

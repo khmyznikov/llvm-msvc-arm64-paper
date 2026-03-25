@@ -50,10 +50,15 @@
     </ClCompile>
   </ItemDefinitionGroup>
 
+  <!-- Exclude NASM x86 assembly from ARM64 builds -->
+  <ItemGroup Condition="'$(Platform)'=='ARM64'">
+    <NASM Remove="@(NASM)" />
+  </ItemGroup>
+
   <!-- When ClangCL toolset is used, add clang-specific flags -->
   <ItemDefinitionGroup Condition="'$(PlatformToolset)'=='ClangCL'">
     <ClCompile>
-      <AdditionalOptions>-ffast-math -flto -Wno-incompatible-pointer-types -Wno-implicit-function-declaration %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions>-ffast-math -flto -Wno-incompatible-pointer-types -Wno-implicit-function-declaration -Wno-error=implicit-function-declaration %(AdditionalOptions)</AdditionalOptions>
       <!-- Disable MSVC-specific WPO since we use -flto instead -->
       <WholeProgramOptimization>false</WholeProgramOptimization>
     </ClCompile>

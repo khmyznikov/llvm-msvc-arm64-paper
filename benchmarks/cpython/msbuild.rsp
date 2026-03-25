@@ -4,5 +4,7 @@
 # Enables frame pointers and full debug info for ETW stack walking.
 # Place this in the CPython PCbuild/ directory.
 
-/p:AdditionalOptions="/Oy- /Zi"
+/p:OmitFramePointers=false
+/p:GenerateDebugInformation=DebugFull
+/p:EmbedAllSources=true
 /bl
