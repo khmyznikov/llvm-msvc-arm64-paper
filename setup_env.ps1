@@ -185,15 +185,48 @@ Write-Host ""
 Write-Host "Build tools:" -ForegroundColor White
 
 # -----------------------------------------------------------------------
-# 3. Python
+# 3. Python (with pymanager support)
 # -----------------------------------------------------------------------
+$pymanagerOk = Test-Command "pymanager"
+if ($pymanagerOk) {
+    Write-Status "Python Manager (pymanager)" "OK" "available"
+}
+
 $pythonOk = Test-Command "python"
 if ($pythonOk) {
     $pyVer = (python --version 2>&1) -replace 'Python\s+', ''
-    Write-Status "Python" "OK" "v$pyVer"
+    $pyArch = python -c "import struct; print(struct.calcsize('P')*8)" 2>&1
+    $pyArchLabel = if ($pyArch -eq "64") {
+        $pyPlatform = python -c "import platform; print(platform.machine())" 2>&1
+        if ($pyPlatform -match "ARM64|aarch64") { "arm64" } else { "x64" }
+    } else { "x86" }
+    Write-Status "Python" "OK" "v$pyVer ($pyArchLabel)"
+
+    # Warn if Python arch doesn't match host
+    if ($hostArch -eq "arm64" -and $pyArchLabel -ne "arm64") {
+        Write-Status "Python (native)" "WARN" "Running $pyArchLabel Python on $hostArch host — consider native arm64 Python for benchmarks"
+        if ($pymanagerOk) {
+            Write-Host "         -> Install native: pymanager install 3.14-arm64" -ForegroundColor DarkYellow
+        }
+    }
 } else {
     Write-Status "Python" "MISS" ""
-    Install-IfMissing "Python" "Python.Python.3.12" $false
+    if ($pymanagerOk) {
+        if ($Install) {
+            Write-Host "         -> Installing Python via pymanager..." -ForegroundColor Cyan
+            if ($hostArch -eq "arm64") {
+                & pymanager install "3.14-arm64"
+            } else {
+                & pymanager install "3.14"
+            }
+        } else {
+            $pyTag = if ($hostArch -eq "arm64") { "3.14-arm64" } else { "3.14" }
+            Write-Host "         -> Install with: pymanager install $pyTag" -ForegroundColor DarkYellow
+        }
+    } else {
+        Install-IfMissing "Python Manager" "9NQ7512CXL7T" $false
+        Write-Host "         -> Then: pymanager install 3.14" -ForegroundColor DarkYellow
+    }
 }
 
 # -----------------------------------------------------------------------
