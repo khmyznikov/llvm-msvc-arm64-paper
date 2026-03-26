@@ -81,27 +81,81 @@ Write-Host ""
 # -----------------------------------------------------------------------
 Write-Host "Compilers:" -ForegroundColor White
 
-$vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
-if (-not (Test-Path $vswhere)) {
+# Directly locate cl.exe for a given VS install + target architecture by reading
+# the toolset version file and constructing the expected path.  Works even when
+# vcvarsall.bat fails to set up the environment (e.g. VC.CoreBuildTools missing).
+function Find-ClExe($vsRoot, $targetArch) {
+    $verFile = Join-Path $vsRoot "VC\Auxiliary\Build\Microsoft.VCToolsVersion.default.txt"
+    if (-not (Test-Path $verFile)) { return $null }
+    $toolsVer = (Get-Content $verFile).Trim()
+    # Prefer native host; fall back to cross-host
+    $hostArchCandidates = switch ($targetArch) {
+        "arm64" { @("Hostarm64\arm64", "Hostx64\arm64") }
+        "x64"   { @("Hostx64\x64", "Hostarm64\x64") }
+        default { @("Hostx64\$targetArch") }
+    }
+    foreach ($sub in $hostArchCandidates) {
+        $cl = Join-Path $vsRoot "VC\Tools\MSVC\$toolsVer\bin\$sub\cl.exe"
+        if (Test-Path $cl) { return $cl }
+    }
+    return $null
+}
+
+# vswhere lives under the VS Installer; on ARM64 hosts the installer is native (no (x86))
+$vswhere = $null
+foreach ($p in @(
+    "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe",
+    "$env:ProgramFiles\Microsoft Visual Studio\Installer\vswhere.exe"
+)) { if (Test-Path $p) { $vswhere = $p; break } }
+if (-not $vswhere) {
     $vswhere = (Get-Command vswhere -ErrorAction SilentlyContinue).Source
 }
 
+# Locate the VS installation root
 $vsPath = $null
-$msvcVer = $null
 if ($vswhere) {
-    # Check primary platform tools
     $vsPath = & $vswhere -latest -products * `
-        -requires $primaryComponent `
         -property installationPath 2>$null | Select-Object -First 1
+}
 
-    if ($vsPath) {
-        $vcvarsall = Join-Path $vsPath "VC\Auxiliary\Build\vcvarsall.bat"
-        $clVerOutput = cmd /c "`"$vcvarsall`" $primaryVcvarsArg >nul 2>&1 && cl.exe 2>&1" 2>&1
-        $msvcVer = ($clVerOutput | Select-String "Version\s+([\d.]+)" |
-                    ForEach-Object { $_.Matches[0].Groups[1].Value }) | Select-Object -First 1
+# Fallback: probe well-known VS 2022 installation paths when vswhere is absent or returned nothing
+if (-not $vsPath) {
+    foreach ($root in @(
+        "${env:ProgramFiles(x86)}\Microsoft Visual Studio\2022\BuildTools",
+        "$env:ProgramFiles\Microsoft Visual Studio\2022\BuildTools",
+        "$env:ProgramFiles\Microsoft Visual Studio\2022\Enterprise",
+        "$env:ProgramFiles\Microsoft Visual Studio\2022\Professional",
+        "$env:ProgramFiles\Microsoft Visual Studio\2022\Community"
+    )) {
+        if (Test-Path (Join-Path $root "VC\Auxiliary\Build\vcvarsall.bat")) {
+            $vsPath = $root; break
+        }
     }
 }
 
+# --- Detect cl.exe for the PRIMARY platform ---
+$msvcVer = $null
+$usedDirectProbe = $false
+if ($vsPath) {
+    # Method 1: vcvarsall (sets full build environment)
+    $vcvarsall = Join-Path $vsPath "VC\Auxiliary\Build\vcvarsall.bat"
+    $clVerOutput = cmd /c "`"$vcvarsall`" $primaryVcvarsArg >nul 2>&1 && cl.exe 2>&1" 2>&1
+    $msvcVer = ($clVerOutput | Select-String "Version\s+([\d.]+)" |
+                ForEach-Object { $_.Matches[0].Groups[1].Value }) | Select-Object -First 1
+
+    # Method 2: direct filesystem probe (works when VC workload is incomplete)
+    if (-not $msvcVer) {
+        $directCl = Find-ClExe $vsPath $primaryPlatform
+        if ($directCl) {
+            $clVerOutput = & $directCl 2>&1
+            $msvcVer = ($clVerOutput | Select-String "Version\s+([\d.]+)" |
+                        ForEach-Object { $_.Matches[0].Groups[1].Value }) | Select-Object -First 1
+            if ($msvcVer) { $usedDirectProbe = $true }
+        }
+    }
+}
+
+$script:vcvarsallBroken = $false
 if ($vsPath -and $msvcVer) {
     $minVer = [version]"14.50"
     $curMajMin = [version]($msvcVer -replace '^(\d+\.\d+).*', '$1')
@@ -110,20 +164,25 @@ if ($vsPath -and $msvcVer) {
     } else {
         Write-Status "MSVC $primaryPlatform (cl.exe)" "WARN" "v$msvcVer found (need >= 14.50)"
     }
+    # Warn if vcvarsall didn't work (detected via direct probe only)
+    if ($usedDirectProbe) {
+        $script:vcvarsallBroken = $true
+        Write-Status "vcvarsall.bat" "WARN" "cl.exe found but vcvarsall cannot set up the build environment"
+        Write-Host "         -> VC workload incomplete. Open Visual Studio Installer, click Modify on" -ForegroundColor DarkYellow
+        Write-Host "            BuildTools 2022, and enable 'Desktop development with C++' workload." -ForegroundColor DarkYellow
+    }
 } else {
     Write-Status "MSVC $primaryPlatform tools" "MISS" "Visual Studio 2022 with $primaryPlatform C++ workload required"
     Install-IfMissing "Visual Studio Build Tools" "Microsoft.VisualStudio.2022.BuildTools" $false
 }
 
-# Check secondary platform tools (optional)
-if ($vswhere) {
-    $vsPathSecondary = & $vswhere -latest -products * `
-        -requires $secondaryComponent `
-        -property installationPath 2>$null | Select-Object -First 1
-    if ($vsPathSecondary) {
-        Write-Status "MSVC $secondaryPlatform tools" "OK" "$secondaryPlatform C++ workload installed"
+# --- Check secondary platform tools (optional) ---
+if ($vsPath) {
+    $secondaryCl = Find-ClExe $vsPath $secondaryPlatform
+    if ($secondaryCl) {
+        Write-Status "MSVC $secondaryPlatform tools (cross)" "OK" "available for --platform=$secondaryPlatform"
     } else {
-        Write-Status "MSVC $secondaryPlatform tools" "WARN" "Not installed — needed for --platform=$secondaryPlatform"
+        Write-Status "MSVC $secondaryPlatform tools (cross)" "WARN" "Not installed — needed for --platform=$secondaryPlatform"
     }
 }
 
@@ -230,6 +289,21 @@ if ($pythonOk) {
 }
 
 # -----------------------------------------------------------------------
+# 3b. Virtual environment
+# -----------------------------------------------------------------------
+$venvActive = $null -ne $env:VIRTUAL_ENV
+$venvExists = Test-Path (Join-Path $PSScriptRoot ".venv\Scripts\activate.ps1")
+if ($venvActive) {
+    Write-Status "Virtual env" "OK" $env:VIRTUAL_ENV
+} elseif ($venvExists) {
+    Write-Status "Virtual env" "WARN" ".venv exists but is not activated"
+    Write-Host "         -> Run: .venv\Scripts\activate" -ForegroundColor DarkYellow
+} else {
+    Write-Status "Virtual env" "WARN" "No .venv found — pip-installed tools (meson, ninja, invoke) won't be on PATH"
+    Write-Host "         -> Run: python -m venv .venv && .venv\Scripts\activate && pip install -r requirements.txt" -ForegroundColor DarkYellow
+}
+
+# -----------------------------------------------------------------------
 # 4. Git
 # -----------------------------------------------------------------------
 $gitOk = Test-Command "git"
@@ -262,7 +336,11 @@ if ($mesonOk) {
     Write-Status "Meson" "OK" "v$mesonVer"
 } else {
     Write-Status "Meson" "MISS" "Needed for NumPy"
-    Write-Host "         -> Install with: pip install meson" -ForegroundColor DarkYellow
+    if (-not $venvActive) {
+        Write-Host "         -> Activate venv first, then: pip install -r requirements.txt" -ForegroundColor DarkYellow
+    } else {
+        Write-Host "         -> Install with: pip install meson" -ForegroundColor DarkYellow
+    }
 }
 
 # -----------------------------------------------------------------------
@@ -274,7 +352,11 @@ if ($ninjaOk) {
     Write-Status "Ninja" "OK" "v$ninjaVer"
 } else {
     Write-Status "Ninja" "MISS" "Needed for Meson/NumPy builds"
-    Install-IfMissing "Ninja" "Ninja-build.Ninja" $false
+    if (-not $venvActive) {
+        Write-Host "         -> Activate venv first, then: pip install -r requirements.txt" -ForegroundColor DarkYellow
+    } else {
+        Write-Host "         -> Install with: pip install ninja" -ForegroundColor DarkYellow
+    }
 }
 
 # -----------------------------------------------------------------------

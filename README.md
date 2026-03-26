@@ -22,6 +22,11 @@ Automated build, benchmark, and profiling framework for comparing MSVC and LLVM 
   - x64 machines: `pymanager install 3.14`
 - **Git**, **SVN** (for LAME), **Meson**, **Ninja**, **CMake**
 - **Windows Performance Toolkit** (xperf) for profiling
+- **PowerShell 7+** — required to run `setup_env.ps1`
+  ```powershell
+  winget install --id Microsoft.PowerShell --source winget
+  ```
+  VS Code users: install the [PowerShell extension](https://marketplace.visualstudio.com/items?itemName=ms-vscode.PowerShell)
 
 ### Validate environment
 
@@ -29,6 +34,19 @@ Automated build, benchmark, and profiling framework for comparing MSVC and LLVM 
 .\setup_env.ps1           # Check all tools
 .\setup_env.ps1 -Install  # Auto-install missing tools via winget
 ```
+
+> **Execution policy error?** If you see `running scripts is disabled on this system`, use one of these workarounds:
+>
+> ```powershell
+> # Option A: allow local scripts for current user (recommended, persistent)
+> Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+>
+> # Option B: bypass for this session only
+> Set-ExecutionPolicy -ExecutionPolicy Bypass -Scope Process
+>
+> # Option C: run the script directly without changing policy
+> pwsh -ExecutionPolicy Bypass -File .\setup_env.ps1
+> ```
 
 ## Quick start
 
