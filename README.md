@@ -32,11 +32,11 @@ Automated build, benchmark, and profiling framework for comparing MSVC and LLVM 
 
 ## Quick start
 
-```bash
+```pwsh
 # 0. Install Python via Python Manager (recommended)
-#    winget install 9NQ7512CXL7T
-#    pymanager install 3.14         # x64 machine
-#    pymanager install 3.14-arm64   # ARM64 machine
+    winget install 9NQ7512CXL7T
+    pymanager install 3.14         # x64 machine
+    pymanager install 3.14-arm64   # ARM64 machine
 
 # 1. Create and activate a virtual environment
 python -m venv .venv
