@@ -50,8 +50,8 @@ def _build_llvm(env, platform, noinline=False):
     clangcl = find_clangcl()
     defines = "-DNOINLINE" if noinline else ""
     cmd = (
-        f'"{clangcl}" -O3 -flto /clang:-ffast-math /GS- /Zi /Zo /Oy- {defines} '
-        f'"{SRC_FILE}" -o "{out_exe}" -fuse-ld=lld '
+        f'"{clangcl}" /clang:-O3 -flto /clang:-ffast-math /clang:-fuse-ld=lld /GS- /Zi /Zo /Oy- {defines} '
+        f'"{SRC_FILE}" -o "{out_exe}" '
         f'/link /LTCG /OPT:REF /OPT:ICF /INCREMENTAL:NO /DEBUG /DEBUGTYPE:FIXUP,CV'
     )
     subprocess.run(cmd, shell=True, env=env, check=True)

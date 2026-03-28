@@ -65,8 +65,7 @@ def patch(c):
     config_ms = LAME_SRC / "configMS.h"
     if config_ms.exists():
         text = config_ms.read_text(encoding="utf-8")
-        old_block = 'typedef __int8 int8_t;'
-        if old_block in text:
+        if 'typedef' in text and '__int8' in text and 'int8_t' in text:
             lines = text.splitlines(keepends=True)
             new_lines = []
             inserted = False
@@ -150,7 +149,7 @@ def _patch_vcxprojs_for_arm64():
                 # Remove NASM/SSE-specific child elements
                 for child in list(arm64_elem):
                     child_text = ET.tostring(child, encoding="unicode")
-                    if any(kw in child_text for kw in ["NASM", "nasm", "SSE2", "__SSE__", ".nas"]):
+                    if any(kw in child_text for kw in ["NASM", "nasm", "SSE2", "__SSE__", ".nas", "xmm_quantize"]):
                         arm64_elem.remove(child)
                     # Also clean sub-children
                     for subchild in list(child):
@@ -162,6 +161,22 @@ def _patch_vcxprojs_for_arm64():
         for after_elem, new_elem in elements_to_add:
             idx = list(root).index(after_elem)
             root.insert(idx + 1, new_elem)
+
+        # 3. Clone Release|x64 conditions on nested elements (e.g. CustomBuild
+        #    children like Command, Outputs, Message) where the condition is on
+        #    the child, not on the parent ItemGroup.
+        import copy as copy_mod
+        for elem in root.iter():
+            children_to_add = []
+            for child in list(elem):
+                cond = child.get("Condition", "")
+                if "'Release|x64'" in cond:
+                    arm64_child = copy_mod.deepcopy(child)
+                    arm64_child.set("Condition", cond.replace("x64", "ARM64"))
+                    children_to_add.append((child, arm64_child))
+            for after_child, new_child in children_to_add:
+                idx = list(elem).index(after_child)
+                elem.insert(idx + 1, new_child)
 
         # Write back with XML declaration
         tree.write(str(vcxproj_path), xml_declaration=True, encoding="utf-8")

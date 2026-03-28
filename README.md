@@ -8,7 +8,7 @@ Automated build, benchmark, and profiling framework for comparing MSVC and LLVM 
 |---------|--------|-------------|-----------|
 | **LAME MP3** | SVN r6531 | MSBuild (VS2019) | Encode WAV → MP3, 20 runs |
 | **NumPy** | v2.4.1 | Meson | `count_nonzero` (1M elements) |
-| **CPython** | v3.14.2 | MSBuild (PCBuild) | pyperformance (112 benchmarks) + pybench |
+| **CPython** | v3.14.2 | MSBuild (PCBuild) | pyperformance (15 CPU-bound benchmarks) |
 | **Custom strcmp** | Local | Direct cl/clang-cl | Byte-by-byte comparison, 3 runs |
 | **Blender** | v5.0.1 | CMake | 14 official benchmark scenes |
 
@@ -113,8 +113,8 @@ inv cpython.patch                       # Copy profiling props to PCbuild
 inv cpython.build --toolchain=msvc      # Non-PGO build
 inv cpython.build --toolchain=msvc --pgo  # PGO build
 inv cpython.build --toolchain=llvm      # clang-cl build
-inv cpython.bench --toolchain=msvc      # pyperformance (112 benchmarks)
-inv cpython.bench-pybench --toolchain=msvc  # pybench
+inv cpython.bench --toolchain=msvc      # pyperformance (all 112 benchmarks)
+inv cpython.bench --toolchain=msvc --fast  # CPU-bound subset (15 benchmarks)
 inv cpython.profile --toolchain=msvc --benchmark=deltablue  # ETW trace
 ```
 

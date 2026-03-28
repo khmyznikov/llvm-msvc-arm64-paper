@@ -188,14 +188,37 @@ def _get_python_exe(toolchain, platform=config.DEFAULT_PLATFORM, pgo=False):
 # Benchmark: pyperformance
 # ---------------------------------------------------------------------------
 
+# CPU-bound subset: benchmarks most sensitive to compiler codegen differences.
+# These exercise tight loops, arithmetic, object allocation, and call overhead
+# rather than I/O, regex, or templating — so differences reflect compiler quality.
+FAST_BENCHMARKS = [
+    "deltablue",         # constraint solver — tight OOP dispatch
+    "richards",          # OS simulation — method calls + branching
+    "nbody",             # float arithmetic in tight loop
+    "spectral_norm",     # nested float loops
+    "fannkuch",          # integer permutation — branch-heavy
+    "chaos",             # float geometry — math-heavy
+    "float",             # basic float ops
+    "pidigits",          # bignum arithmetic
+    "hexiom",            # recursive search + heuristics
+    "go",                # board game AI — deep branching
+    "raytrace",          # 3D math — float + object overhead
+    "crypto_pyaes",      # byte-level AES — integer + indexing
+    "pyflate",           # zlib-like — bitwise ops
+    "pickle_pure_python",  # object serialization — call overhead
+    "unpickle_pure_python",
+]
+
+
 @task(
     help={
         "toolchain": "msvc or llvm (default: msvc)",
         "platform": f"arm64 or x64 (default: {config.DEFAULT_PLATFORM})",
         "pgo": "Use PGO build (default: False)",
+        "fast": "Run only CPU-bound subset (~18 benchmarks) instead of all 112",
     },
 )
-def bench(c, toolchain="msvc", platform=config.DEFAULT_PLATFORM, pgo=False):
+def bench(c, toolchain="msvc", platform=config.DEFAULT_PLATFORM, pgo=False, fast=False):
     """Run pyperformance benchmarks against the built CPython."""
     python_exe = _get_python_exe(toolchain, platform, pgo)
     if not python_exe:
@@ -215,6 +238,9 @@ def bench(c, toolchain="msvc", platform=config.DEFAULT_PLATFORM, pgo=False):
         "--rigorous",
         f"--output={result_file}",
     ]
+    if fast:
+        cmd.extend(["--benchmarks", ",".join(FAST_BENCHMARKS)])
+        print(f"[cpython] Fast mode: {len(FAST_BENCHMARKS)} CPU-bound benchmarks")
     subprocess.run(cmd, check=True)
     print(f"[cpython] pyperformance complete. Results: {result_file}")
 
