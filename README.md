@@ -11,7 +11,6 @@ Automated build, benchmark, and profiling framework for comparing MSVC and LLVM 
 | **CPython** | v3.14.2 | MSBuild (PCBuild) | pyperformance (15 CPU-bound benchmarks) |
 | **Custom strcmp** | Local | Direct cl/clang-cl | Byte-by-byte comparison, 3 runs |
 | **x264** | stable | Direct cl/clang-cl | H.264 encode 720p, 3 runs |
-| **Blender** | v5.0.1 | CMake | 14 official benchmark scenes |
 
 ## Prerequisites
 
@@ -137,22 +136,6 @@ inv x264.bench                          # Encode 720p YUV, 3 runs each toolchain
 inv x264.profile --toolchain=msvc       # ETW trace
 ```
 
-### Blender (preliminary — ARM64 MSVC unsupported)
-
-> **Note:** Blender officially only supports Clang for ARM64 Windows builds. MSVC ARM64 builds
-> crash during Cycles initialization due to codegen issues. LLVM builds may also have DLL
-> compatibility problems with the prebuilt dependency libraries. Blender benchmarks are
-> included for completeness but may not work on all configurations.
-
-```bash
-inv blender.fetch                       # Clone + download prebuilt deps (~GB)
-inv blender.patch                       # Fix Cycles time.cpp for MSVC ARM64
-inv blender.build --toolchain=msvc      # CMake Release build (no LTCG)
-inv blender.build --toolchain=llvm      # clang-cl Release build (no LTO)
-inv blender.bench --toolchain=msvc      # Render all 14 benchmark scenes
-inv blender.profile --toolchain=msvc --scene=bmw27  # ETW trace
-```
-
 ## Results
 
 Benchmark results are saved to `results/` as JSON files:
@@ -172,9 +155,8 @@ results/
 │   └── pyperformance_llvm_pgo.json
 ├── strcmp/
 │   └── strcmp_results.json
-└── blender/
-    ├── blender_msvc.json
-    └── blender_llvm.json
+└── x264/
+    └── x264_results.json
 ```
 
 ETW traces (`.etl` files) are also saved to the respective results subdirectories.
@@ -210,7 +192,7 @@ Analyze traces with [Profile Explorer](https://github.com/niclaslindstedt/profil
 │   ├── numpy/                    # NumPy count_nonzero
 │   ├── cpython/                  # CPython pyperformance
 │   ├── strcmp/                   # Custom strcmp benchmark
-│   └── blender/                  # Blender render benchmark
+│   └── x264/                    # x264 H.264 encoder
 ├── results/                      # Benchmark output (gitignored)
 └── sources/                      # Auto-fetched sources (gitignored)
 ```

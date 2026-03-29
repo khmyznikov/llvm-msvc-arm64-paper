@@ -6,7 +6,6 @@ from benchmarks.lame import tasks as lame_tasks
 from benchmarks.numpy import tasks as numpy_tasks
 from benchmarks.cpython import tasks as cpython_tasks
 from benchmarks.strcmp import tasks as strcmp_tasks
-from benchmarks.blender import tasks as blender_tasks
 from benchmarks.x264 import tasks as x264_tasks
 
 
@@ -18,7 +17,7 @@ def fetch_all(c, toolchain="both"):
     c.run("inv lame.fetch", pty=False)
     c.run("inv numpy.fetch", pty=False)
     c.run("inv cpython.fetch", pty=False)
-    c.run("inv blender.fetch", pty=False)
+    c.run("inv x264.fetch", pty=False)
     print("[all] All sources fetched.")
 
 
@@ -36,7 +35,7 @@ def build_all(c, toolchain="both", platform="arm64"):
         c.run(f"inv numpy.build --toolchain={tc} --platform={platform}", pty=False)
         c.run(f"inv cpython.build --toolchain={tc} --platform={platform}", pty=False)
         c.run(f"inv strcmp.build --toolchain={tc} --platform={platform}", pty=False)
-        c.run(f"inv blender.build --toolchain={tc} --platform={platform}", pty=False)
+        c.run(f"inv x264.build --toolchain={tc} --platform={platform}", pty=False)
     print(f"[all] All projects built ({toolchain}/{platform}).")
 
 
@@ -54,7 +53,7 @@ def bench_all(c, toolchain="both", platform="arm64"):
         c.run(f"inv numpy.bench --toolchain={tc} --platform={platform}", pty=False)
         c.run(f"inv cpython.bench --toolchain={tc} --platform={platform}", pty=False)
         c.run(f"inv strcmp.bench --toolchain={tc} --platform={platform}", pty=False)
-        c.run(f"inv blender.bench --toolchain={tc} --platform={platform}", pty=False)
+        c.run(f"inv x264.bench --toolchain={tc} --platform={platform}", pty=False)
     print(f"[all] All benchmarks complete ({toolchain}/{platform}).")
 
 
@@ -85,5 +84,4 @@ ns.add_collection(Collection.from_module(lame_tasks), name="lame")
 ns.add_collection(Collection.from_module(numpy_tasks), name="numpy")
 ns.add_collection(Collection.from_module(cpython_tasks), name="cpython")
 ns.add_collection(Collection.from_module(strcmp_tasks), name="strcmp")
-ns.add_collection(Collection.from_module(blender_tasks), name="blender")
 ns.add_collection(Collection.from_module(x264_tasks), name="x264")

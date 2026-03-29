@@ -92,10 +92,6 @@ NUMPY_TAG = "v2.4.1"
 CPYTHON_GIT_URL = "https://github.com/python/cpython.git"
 CPYTHON_TAG = "v3.14.2"
 
-BLENDER_GIT_URL = "https://projects.blender.org/blender/blender.git"
-BLENDER_TAG = "v5.0.1"
-BLENDER_MAIN_COMMIT = "76c90257"
-
 X264_GIT_URL = "https://code.videolan.org/videolan/x264.git"
 X264_TAG = "stable"  # stable branch; pinned at clone time via --depth 1
 
@@ -105,11 +101,6 @@ LAME_WAV_URL = (
     "pts-trondheim-3.tar.bz2"
 )
 LAME_WAV_NAME = "pts-trondheim.wav"
-
-# Blender benchmark scenes
-BLENDER_BENCHMARKS_URL = (
-    "https://projects.blender.org/blender/blender-benchmarks"
-)
 
 # ---------------------------------------------------------------------------
 # Compiler versions (expected)
@@ -141,13 +132,6 @@ NUMPY_BENCH_SIZE = 1_000_000
 NUMPY_BENCH_NUMAXES = 1
 
 STRCMP_BENCH_RUNS = 3
-
-BLENDER_SCENES = [
-    "bmw27", "barbershop_interior", "classroom", "fishy_cat",
-    "koro", "monster", "pavilion_barcelona", "pabellon_barcelona",
-    "spring", "teacher", "victor", "village",
-    "wasp", "junkshop",
-]
 
 X264_BENCH_RUNS = 3
 # Synthetic 720p YUV420 test input: 300 frames (~10 sec at 30fps)
