@@ -131,8 +131,6 @@ LAME_EXTRA_FLAGS = ["-h", "-V", "0", "--silent"]  # High-quality VBR, suppress I
 NUMPY_BENCH_SIZE = 1_000_000
 NUMPY_BENCH_NUMAXES = 1
 
-STRCMP_BENCH_RUNS = 3
-
 X264_BENCH_RUNS = 3
 # Synthetic 720p YUV420 test input: 300 frames (~10 sec at 30fps)
 X264_INPUT_FRAMES = 300

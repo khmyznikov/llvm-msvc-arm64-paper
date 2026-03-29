@@ -5,7 +5,6 @@ from invoke import Collection, task
 from benchmarks.lame import tasks as lame_tasks
 from benchmarks.numpy import tasks as numpy_tasks
 from benchmarks.cpython import tasks as cpython_tasks
-from benchmarks.strcmp import tasks as strcmp_tasks
 from benchmarks.x264 import tasks as x264_tasks
 
 
@@ -34,7 +33,6 @@ def build_all(c, toolchain="both", platform="arm64"):
         c.run(f"inv lame.build --toolchain={tc} --platform={platform}", pty=False)
         c.run(f"inv numpy.build --toolchain={tc} --platform={platform}", pty=False)
         c.run(f"inv cpython.build --toolchain={tc} --platform={platform}", pty=False)
-        c.run(f"inv strcmp.build --toolchain={tc} --platform={platform}", pty=False)
         c.run(f"inv x264.build --toolchain={tc} --platform={platform}", pty=False)
     print(f"[all] All projects built ({toolchain}/{platform}).")
 
@@ -52,7 +50,6 @@ def bench_all(c, toolchain="both", platform="arm64"):
         c.run(f"inv lame.bench --toolchain={tc} --platform={platform}", pty=False)
         c.run(f"inv numpy.bench --toolchain={tc} --platform={platform}", pty=False)
         c.run(f"inv cpython.bench --toolchain={tc} --platform={platform}", pty=False)
-        c.run(f"inv strcmp.bench --toolchain={tc} --platform={platform}", pty=False)
         c.run(f"inv x264.bench --toolchain={tc} --platform={platform}", pty=False)
     print(f"[all] All benchmarks complete ({toolchain}/{platform}).")
 
@@ -69,7 +66,7 @@ def profile_all(c, toolchain="both", platform="arm64"):
     for tc in toolchains:
         c.run(f"inv lame.profile --toolchain={tc} --platform={platform}", pty=False)
         c.run(f"inv cpython.profile --toolchain={tc} --platform={platform}", pty=False)
-        c.run(f"inv strcmp.profile --toolchain={tc} --platform={platform}", pty=False)
+        c.run(f"inv x264.profile --toolchain={tc} --platform={platform}", pty=False)
     print(f"[all] All profiles captured ({toolchain}/{platform}).")
 
 
@@ -83,5 +80,4 @@ ns.add_task(profile_all, name="profile-all")
 ns.add_collection(Collection.from_module(lame_tasks), name="lame")
 ns.add_collection(Collection.from_module(numpy_tasks), name="numpy")
 ns.add_collection(Collection.from_module(cpython_tasks), name="cpython")
-ns.add_collection(Collection.from_module(strcmp_tasks), name="strcmp")
 ns.add_collection(Collection.from_module(x264_tasks), name="x264")

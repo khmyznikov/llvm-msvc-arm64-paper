@@ -1,6 +1,6 @@
 # MSVC vs LLVM on Windows — Benchmarks
 
-Automated build, benchmark, and profiling framework for comparing MSVC and LLVM (clang-cl) compiler output on Windows across five open-source projects. Supports both **x64** and **ARM64** platforms (ARM64 is the primary target).
+Automated build, benchmark, and profiling framework for comparing MSVC and LLVM (clang-cl) compiler output on Windows across four open-source projects. Supports both **x64** and **ARM64** platforms (ARM64 is the primary target).
 
 ## Projects
 
@@ -9,7 +9,6 @@ Automated build, benchmark, and profiling framework for comparing MSVC and LLVM 
 | **LAME MP3** | SVN r6531 | MSBuild (VS2019) | Encode WAV → MP3, 20 runs |
 | **NumPy** | v2.4.1 | Meson | `count_nonzero` (1M elements) |
 | **CPython** | v3.14.2 | MSBuild (PCBuild) | pyperformance (15 CPU-bound benchmarks) |
-| **Custom strcmp** | Local | Direct cl/clang-cl | Byte-by-byte comparison, 3 runs |
 | **x264** | stable | Direct cl/clang-cl | H.264 encode 720p, 3 runs |
 
 ## Prerequisites
@@ -118,15 +117,6 @@ inv cpython.bench --toolchain=msvc --fast  # CPU-bound subset (15 benchmarks)
 inv cpython.profile --toolchain=msvc --benchmark=deltablue  # ETW trace
 ```
 
-### Custom strcmp
-
-```bash
-inv strcmp.build --toolchain=both       # Build all 4 variants (msvc/llvm x inline/noinline)
-inv strcmp.bench                        # Run all variants, 3 runs each
-inv strcmp.profile --toolchain=msvc     # ETW trace of inline MSVC variant
-inv strcmp.profile --toolchain=llvm --noinline  # ETW trace of noinline LLVM variant
-```
-
 ### x264 (H.264 encoder)
 
 ```bash
@@ -153,8 +143,6 @@ results/
 │   ├── pyperformance_llvm.json
 │   ├── pyperformance_msvc_pgo.json
 │   └── pyperformance_llvm_pgo.json
-├── strcmp/
-│   └── strcmp_results.json
 └── x264/
     └── x264_results.json
 ```
@@ -191,7 +179,6 @@ Analyze traces with [Profile Explorer](https://github.com/niclaslindstedt/profil
 │   ├── lame/                     # LAME MP3 encoder
 │   ├── numpy/                    # NumPy count_nonzero
 │   ├── cpython/                  # CPython pyperformance
-│   ├── strcmp/                   # Custom strcmp benchmark
 │   └── x264/                    # x264 H.264 encoder
 ├── results/                      # Benchmark output (gitignored)
 └── sources/                      # Auto-fetched sources (gitignored)
