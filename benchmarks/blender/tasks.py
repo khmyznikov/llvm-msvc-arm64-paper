@@ -57,10 +57,33 @@ def fetch(c):
         _merge_presets(presets_dest)
 
     # Run make update to fetch prebuilt libraries
-    make_bat = BLENDER_SRC / "make.bat"
-    if make_bat.exists():
-        print("[blender] Running 'make update' to fetch dependencies (this may take a while)...")
-        c.run(f'cd /d "{BLENDER_SRC}" && make.bat update', warn=True)
+    # On ARM64 Windows, make.bat defaults to Clang; pass 'msvc' switch to force MSVC
+    # detection so the update can proceed even without the ClangCL VS toolset.
+    # If make.bat fails (e.g. BuildTools-only install not detected by vswhere),
+    # fall back to a direct git submodule + LFS checkout.
+    lib_subdir = "lib/windows_arm64" if config.DEFAULT_PLATFORM == "arm64" else "lib/windows_x64"
+    lib_dir = BLENDER_SRC / lib_subdir
+    if lib_dir.exists():
+        print(f"[blender] Prebuilt libs already present at {lib_dir}")
+    else:
+        make_bat = BLENDER_SRC / "make.bat"
+        if make_bat.exists():
+            print("[blender] Running 'make update' to fetch dependencies...")
+            result = c.run(f'cd /d "{BLENDER_SRC}" && make.bat update msvc', warn=True)
+        # If make.bat didn't produce the libs, fetch directly via git submodule
+        if not lib_dir.exists():
+            print(f"[blender] Fetching {lib_subdir} via git submodule...")
+            import os
+            c.run(f'git -C "{BLENDER_SRC}" config --local "submodule.{lib_subdir}.update" "checkout"')
+            env_lfs = os.environ.copy()
+            env_lfs["GIT_LFS_SKIP_SMUDGE"] = "1"
+            subprocess.run(
+                ["git", "-C", str(BLENDER_SRC), "submodule", "update", "--progress", "--init", lib_subdir],
+                env=env_lfs, check=True,
+            )
+            print(f"[blender] Running git lfs pull in {lib_subdir} (this may take a while)...")
+            subprocess.run(["git", "lfs", "pull"], cwd=str(lib_dir), check=True)
+            print(f"[blender] Prebuilt libs downloaded to {lib_dir}")
 
 
 def _merge_presets(dest: Path):
@@ -83,11 +106,68 @@ def _merge_presets(dest: Path):
 
 
 # ---------------------------------------------------------------------------
+# Patches
+# ---------------------------------------------------------------------------
+
+@task(pre=[fetch])
+def patch(c):
+    """Apply source patches needed for building with MSVC on ARM64.
+
+    Currently fixes intern/cycles/util/time.cpp where:
+    - ARCH_COMPILER_MSVC is used but never defined → replaced with _MSC_VER
+    - ARM64_CNTVCT_EL0 / ARM64_CNTFRQ_EL0 are missing in older MSVC → adds fallback defines
+    """
+    marker = BLENDER_SRC / ".patched_bench"
+    if marker.exists():
+        print("[blender] Already patched.")
+        return
+
+    # --- Fix Cycles time.cpp for MSVC ARM64 ---
+    time_cpp = BLENDER_SRC / "intern" / "cycles" / "util" / "time.cpp"
+    if time_cpp.exists():
+        text = time_cpp.read_text(encoding="utf-8")
+        patched = False
+
+        # 1. Replace ARCH_COMPILER_MSVC with _MSC_VER
+        if "ARCH_COMPILER_MSVC" in text:
+            text = text.replace("ARCH_COMPILER_MSVC", "_MSC_VER")
+            patched = True
+
+        # 2. Add ARM64 register constant fallbacks for older MSVC
+        needle = (
+            '#if defined(__aarch64__) || defined(_M_ARM64)\n'
+            '/* Use cntvct_el0/cntfrq_el0 registers on ARM64. */\n'
+        )
+        fallback_block = (
+            '#if defined(__aarch64__) || defined(_M_ARM64)\n'
+            '/* Use cntvct_el0/cntfrq_el0 registers on ARM64. */\n'
+            '\n'
+            '/* Older MSVC versions (< 14.45) may not define these register constants. */\n'
+            '#  if defined(_MSC_VER) && !defined(ARM64_CNTVCT_EL0)\n'
+            '#    define ARM64_CNTVCT_EL0  ARM64_SYSREG(3, 3, 14, 0, 2)\n'
+            '#    define ARM64_CNTFRQ_EL0  ARM64_SYSREG(3, 3, 14, 0, 0)\n'
+            '#  endif\n'
+        )
+        if needle in text and "ARM64_SYSREG(3, 3, 14, 0, 2)" not in text:
+            text = text.replace(needle, fallback_block)
+            patched = True
+
+        if patched:
+            time_cpp.write_text(text, encoding="utf-8")
+            print("[blender] Patched intern/cycles/util/time.cpp (MSVC ARM64 timer fix)")
+        else:
+            print("[blender] time.cpp already patched or doesn't need patching")
+
+    marker.write_text("patched")
+    print("[blender] Patches applied.")
+
+
+# ---------------------------------------------------------------------------
 # Build
 # ---------------------------------------------------------------------------
 
 @task(
-    pre=[fetch],
+    pre=[fetch, patch],
     help={
         "toolchain": "msvc or llvm (default: msvc)",
         "platform": f"arm64 or x64 (default: {config.DEFAULT_PLATFORM})",
@@ -112,13 +192,37 @@ def build(c, toolchain="msvc", platform=config.DEFAULT_PLATFORM):
     build_cmd = f'cmake --build "{build_dir}" --config Release --parallel'
     subprocess.run(build_cmd, shell=True, env=env, check=True)
 
+    # CMake install — copies DLLs, manifests, and data files alongside blender.exe
+    install_cmd = f'cmake --install "{build_dir}" --config Release'
+    subprocess.run(install_cmd, shell=True, env=env, check=True)
+
+    # ClangCL / lld-link don't embed the SxS manifest automatically.
+    # Without it, blender.exe can't find DLLs in blender.crt/ and blender.shared/.
+    blender_exe = build_dir / "bin" / "blender.exe"
+    manifest_file = build_dir / "bin" / "blender.exe.manifest"
+    if blender_exe.exists() and manifest_file.exists():
+        mt_cmd = (
+            f'mt -manifest "{manifest_file}" '
+            f'-outputresource:"{blender_exe}";#1'
+        )
+        result = subprocess.run(mt_cmd, shell=True, env=env, capture_output=True, text=True)
+        if result.returncode == 0:
+            print("[blender] Embedded SxS manifest into blender.exe")
+        else:
+            print(f"[blender] Warning: failed to embed manifest (mt.exe): {result.stderr.strip()}")
+
     print(f"[blender] Build complete ({toolchain}/{platform}). Output: {build_dir}")
 
 
 def _find_blender_exe(toolchain, platform=config.DEFAULT_PLATFORM):
-    """Locate the built blender.exe."""
+    """Locate the installed blender-launcher.exe (handles DLL loading via SxS manifests)."""
     build_dir = BUILD_DIR / f"{toolchain}_{platform}"
-    for subdir in ["bin/Release", "bin", "Release", ""]:
+    # blender-launcher.exe sets up DLL search paths for blender.shared/blender.crt
+    for subdir in ["bin", "bin/Release", "Release", ""]:
+        launcher = build_dir / subdir / "blender-launcher.exe"
+        if launcher.exists():
+            return launcher
+        # Fall back to blender.exe if no launcher
         candidate = build_dir / subdir / "blender.exe"
         if candidate.exists():
             return candidate

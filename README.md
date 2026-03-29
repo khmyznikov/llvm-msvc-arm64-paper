@@ -10,6 +10,7 @@ Automated build, benchmark, and profiling framework for comparing MSVC and LLVM 
 | **NumPy** | v2.4.1 | Meson | `count_nonzero` (1M elements) |
 | **CPython** | v3.14.2 | MSBuild (PCBuild) | pyperformance (15 CPU-bound benchmarks) |
 | **Custom strcmp** | Local | Direct cl/clang-cl | Byte-by-byte comparison, 3 runs |
+| **x264** | stable | Direct cl/clang-cl | H.264 encode 720p, 3 runs |
 | **Blender** | v5.0.1 | CMake | 14 official benchmark scenes |
 
 ## Prerequisites
@@ -127,10 +128,25 @@ inv strcmp.profile --toolchain=msvc     # ETW trace of inline MSVC variant
 inv strcmp.profile --toolchain=llvm --noinline  # ETW trace of noinline LLVM variant
 ```
 
-### Blender (preliminary)
+### x264 (H.264 encoder)
+
+```bash
+inv x264.fetch                          # Clone x264 stable branch
+inv x264.build --toolchain=both         # Build with MSVC and clang-cl (pure C, no ASM)
+inv x264.bench                          # Encode 720p YUV, 3 runs each toolchain
+inv x264.profile --toolchain=msvc       # ETW trace
+```
+
+### Blender (preliminary — ARM64 MSVC unsupported)
+
+> **Note:** Blender officially only supports Clang for ARM64 Windows builds. MSVC ARM64 builds
+> crash during Cycles initialization due to codegen issues. LLVM builds may also have DLL
+> compatibility problems with the prebuilt dependency libraries. Blender benchmarks are
+> included for completeness but may not work on all configurations.
 
 ```bash
 inv blender.fetch                       # Clone + download prebuilt deps (~GB)
+inv blender.patch                       # Fix Cycles time.cpp for MSVC ARM64
 inv blender.build --toolchain=msvc      # CMake Release build (no LTCG)
 inv blender.build --toolchain=llvm      # clang-cl Release build (no LTO)
 inv blender.bench --toolchain=msvc      # Render all 14 benchmark scenes

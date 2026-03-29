@@ -7,6 +7,7 @@ from benchmarks.numpy import tasks as numpy_tasks
 from benchmarks.cpython import tasks as cpython_tasks
 from benchmarks.strcmp import tasks as strcmp_tasks
 from benchmarks.blender import tasks as blender_tasks
+from benchmarks.x264 import tasks as x264_tasks
 
 
 @task(
@@ -85,3 +86,4 @@ ns.add_collection(Collection.from_module(numpy_tasks), name="numpy")
 ns.add_collection(Collection.from_module(cpython_tasks), name="cpython")
 ns.add_collection(Collection.from_module(strcmp_tasks), name="strcmp")
 ns.add_collection(Collection.from_module(blender_tasks), name="blender")
+ns.add_collection(Collection.from_module(x264_tasks), name="x264")

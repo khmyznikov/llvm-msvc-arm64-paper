@@ -96,6 +96,9 @@ BLENDER_GIT_URL = "https://projects.blender.org/blender/blender.git"
 BLENDER_TAG = "v5.0.1"
 BLENDER_MAIN_COMMIT = "76c90257"
 
+X264_GIT_URL = "https://code.videolan.org/videolan/x264.git"
+X264_TAG = "stable"  # stable branch; pinned at clone time via --depth 1
+
 # Phoronix test wav for LAME benchmark
 LAME_WAV_URL = (
     "https://www.phoronix-test-suite.com/benchmark-files/"
@@ -145,6 +148,12 @@ BLENDER_SCENES = [
     "spring", "teacher", "victor", "village",
     "wasp", "junkshop",
 ]
+
+X264_BENCH_RUNS = 3
+# Synthetic 720p YUV420 test input: 300 frames (~10 sec at 30fps)
+X264_INPUT_FRAMES = 300
+X264_INPUT_WIDTH = 1280
+X264_INPUT_HEIGHT = 720
 
 # ---------------------------------------------------------------------------
 # Profiling

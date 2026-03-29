@@ -1,0 +1,66 @@
+{
+  "benchmark": "x264_encode",
+  "machine": {
+    "machine_id": "gleb-devkit-arm64",
+    "hostname": "GLEB-DEVKIT",
+    "arch": "ARM64",
+    "processor": "ARMv8 (64-bit) Family 8 Model D4B Revision   0, Qualcomm Technologies Inc",
+    "os": "Windows-11-10.0.27975-SP0",
+    "cpu_count": 8
+  },
+  "platform": "arm64",
+  "input": {
+    "width": 1280,
+    "height": 720,
+    "frames": 300,
+    "format": "yuv420p",
+    "preset": "medium"
+  },
+  "runs_per_toolchain": 3,
+  "results": {
+    "msvc": {
+      "runs": [
+        {
+          "elapsed_sec": 96.95415350000258,
+          "fps": 3.14,
+          "returncode": 0
+        },
+        {
+          "elapsed_sec": 105.22422839998035,
+          "fps": 2.85,
+          "returncode": 0
+        },
+        {
+          "elapsed_sec": 91.18234490000759,
+          "fps": 3.29,
+          "returncode": 0
+        }
+      ],
+      "mean_fps": 3.0933333333333337,
+      "min_fps": 2.85,
+      "max_fps": 3.29
+    },
+    "llvm": {
+      "runs": [
+        {
+          "elapsed_sec": 69.0544989000191,
+          "fps": 4.48,
+          "returncode": 0
+        },
+        {
+          "elapsed_sec": 66.99248049999005,
+          "fps": 4.48,
+          "returncode": 0
+        },
+        {
+          "elapsed_sec": 67.97418370001833,
+          "fps": 4.42,
+          "returncode": 0
+        }
+      ],
+      "mean_fps": 4.46,
+      "min_fps": 4.42,
+      "max_fps": 4.48
+    }
+  }
+}
