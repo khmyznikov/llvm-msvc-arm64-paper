@@ -49,7 +49,7 @@ function Install-IfMissing($name, $wingetId, $present) {
         return
     }
     Write-Host "         -> Installing $name via winget..." -ForegroundColor Cyan
-    winget install --id $wingetId --accept-source-agreements --accept-package-agreements
+    winget install --id $wingetId --architecture $hostArch --accept-source-agreements --accept-package-agreements
 }
 
 Write-Host ""
@@ -237,6 +237,21 @@ if ($clangcl) {
         Write-Status "lld-link" "OK" $lldLink
     } else {
         Write-Status "lld-link" "WARN" "Not found alongside clang-cl; LTO linking will fail"
+    }
+}
+
+# Check ClangCL MSBuild toolset integration (required for MSBuild /p:PlatformToolset=ClangCL)
+if ($vsPath) {
+    foreach ($plat in @($primaryPlatform, $secondaryPlatform)) {
+        $msbuildPlat = if ($plat -eq "x64") { "x64" } else { "ARM64" }
+        $toolsetDir = Join-Path $vsPath "MSBuild\Microsoft\VC\v170\Platforms\$msbuildPlat\PlatformToolsets\ClangCL"
+        if (Test-Path $toolsetDir) {
+            Write-Status "ClangCL toolset ($plat)" "OK" "MSBuild integration present"
+        } else {
+            Write-Status "ClangCL toolset ($plat)" "MISS" "MSBuild cannot use PlatformToolset=ClangCL for $plat"
+            Write-Host "         -> Open Visual Studio Installer -> Modify -> Individual components" -ForegroundColor DarkYellow
+            Write-Host "         -> Install 'C++ Clang Compiler for Windows' and 'MSBuild support for LLVM (clang-cl) toolset'" -ForegroundColor DarkYellow
+        }
     }
 }
 

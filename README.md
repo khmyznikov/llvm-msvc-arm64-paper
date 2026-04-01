@@ -16,6 +16,7 @@ Automated build, benchmark, and profiling framework for comparing MSVC and LLVM 
 - **Windows** machine (x64 or ARM64)
 - **Visual Studio 2022** with C++ workload (MSVC ≥ 14.50); ARM64 tools needed for `--platform=arm64`
 - **LLVM ≥ 21.x** with clang-cl and lld-link
+- **ClangCL MSBuild toolset** — required for LLVM builds of MSBuild projects (LAME, CPython). Install via VS Installer → Individual components → *C++ Clang Compiler for Windows* + *MSBuild support for LLVM (clang-cl) toolset*
 - **Python 3.x** — recommended via [Python Manager](https://github.com/zooba/pymanager) (`winget install 9NQ7512CXL7T`)
   - ARM64 machines: `pymanager install 3.14-arm64` (native ARM64 Python)
   - x64 machines: `pymanager install 3.14`

@@ -1,4 +1,4 @@
-"""Invoke tasks for NumPy count_nonzero benchmark."""
+"""Invoke tasks for NumPy benchmark suite (multiple operations)."""
 
 import json
 import os
@@ -117,29 +117,54 @@ print(f"numpy: {{np.__file__}}", file=sys.stderr)
 size = {size}
 runs = 50
 rng = np.random.default_rng(42)
-arr = rng.integers(0, 10, size=size, dtype=np.int64)
 
-# Warmup
-for _ in range(5):
-    np.count_nonzero(arr)
+# --- Benchmark operations ---
+# Each is a (name, setup_fn, bench_fn) tuple.
+# setup_fn returns data dict; bench_fn(data) runs the timed operation.
+# All chosen to exercise NumPy-internal C loops (ufuncs, sort, reductions),
+# NOT external BLAS, so the compiler toolchain is what matters.
 
-times = []
-for i in range(runs):
-    t0 = time.perf_counter()
-    np.count_nonzero(arr)
-    t1 = time.perf_counter()
-    times.append(t1 - t0)
+benchmarks = []
 
-result = {{
-    "benchmark": "numpy_count_nonzero",
+# 1. sqrt — vectorizable math, compiler quality matters
+arr_pos = rng.uniform(0.1, 100.0, size=size).astype(np.float64)
+benchmarks.append(("sqrt", arr_pos, lambda d: np.sqrt(d)))
+
+# 2. sort — quicksort on random float64 (branch-heavy, cache-intensive)
+arr_sort = rng.random(size=size).astype(np.float64)
+benchmarks.append(("sort", arr_sort, lambda d: np.sort(d)))
+
+results = {{}}
+
+for name, data, fn in benchmarks:
+    # Warmup
+    for _ in range(5):
+        fn(data)
+
+    times = []
+    for i in range(runs):
+        t0 = time.perf_counter()
+        fn(data)
+        t1 = time.perf_counter()
+        times.append(t1 - t0)
+
+    results[name] = {{
+        "times_sec": times,
+        "mean_sec": sum(times) / len(times),
+        "min_sec": min(times),
+        "max_sec": max(times),
+    }}
+    mean_us = sum(times) / len(times) * 1e6
+    min_us = min(times) * 1e6
+    print(f"  {{name:20s}}  mean={{mean_us:8.1f}} us   min={{min_us:8.1f}} us", file=sys.stderr)
+
+output = {{
+    "benchmark": "numpy_suite",
     "size": size,
     "runs": runs,
-    "times_sec": times,
-    "mean_sec": sum(times) / len(times),
-    "min_sec": min(times),
-    "max_sec": max(times),
+    "operations": results,
 }}
-print(json.dumps(result))
+print(json.dumps(output))
 '''
 
 
@@ -150,7 +175,7 @@ print(json.dumps(result))
     },
 )
 def bench(c, toolchain="msvc", platform=config.DEFAULT_PLATFORM):
-    """Run NumPy count_nonzero benchmark."""
+    """Run NumPy benchmark suite (multiple operations)."""
     build_dir = BUILD_DIR / f"{toolchain}_{platform}"
     install_dir = build_dir / "install"
     if not install_dir.exists():
@@ -180,7 +205,7 @@ def bench(c, toolchain="msvc", platform=config.DEFAULT_PLATFORM):
         capture_output=True, text=True, env=env, check=True,
     )
 
-    # Show which numpy was loaded
+    # Show which numpy was loaded + per-op stats
     if result.stderr:
         for line in result.stderr.strip().splitlines():
             print(f"[numpy] {line}")
@@ -195,7 +220,10 @@ def bench(c, toolchain="msvc", platform=config.DEFAULT_PLATFORM):
             data["machine"] = config.get_machine_info()
             result_file = RESULTS_DIR / f"numpy_{toolchain}_{platform}.json"
             result_file.write_text(json.dumps(data, indent=2))
-            print(f"[numpy] Benchmark complete ({toolchain}). Mean: {data['mean_sec']*1e6:.1f}µs")
+            # Print summary
+            print(f"[numpy] Benchmark suite complete ({toolchain}):")
+            for op_name, op_data in data.get("operations", {}).items():
+                print(f"[numpy]   {op_name:20s}  mean={op_data['mean_sec']*1e6:8.1f} µs")
             print(f"[numpy] Results: {result_file}")
             return
 
