@@ -7,7 +7,7 @@ Automated build, benchmark, and profiling framework for comparing MSVC and LLVM 
 | Project | Source | Build System | Benchmark |
 |---------|--------|-------------|-----------|
 | **LAME MP3** | SVN r6531 | MSBuild (VS2019) | Encode WAV → MP3, 20 runs |
-| **NumPy** | v2.4.1 | Meson | `count_nonzero` (1M elements) |
+| **NumPy** | v2.4.1 | Meson | `sqrt`, `sort` (1M elements, 50 runs) |
 | **CPython** | v3.14.2 | MSBuild (PCBuild) | pyperformance (15 CPU-bound benchmarks) |
 | **x264** | stable | Direct cl/clang-cl | H.264 encode 720p, 3 runs |
 
@@ -101,7 +101,7 @@ inv lame.profile --toolchain=msvc       # ETW CPU sampling trace
 inv numpy.fetch                         # Git clone v2.4.1
 inv numpy.build --toolchain=msvc        # Meson build with MSVC
 inv numpy.build --toolchain=llvm        # Meson build with clang-cl
-inv numpy.bench --toolchain=msvc        # count_nonzero benchmark
+inv numpy.bench --toolchain=msvc        # sqrt + sort benchmark
 inv numpy.profile --toolchain=msvc      # ETW trace
 ```
 
@@ -150,6 +150,21 @@ results/
 
 ETW traces (`.etl` files) are also saved to the respective results subdirectories.
 
+## Generate Excel charts
+
+After running benchmarks on one or more machines, generate a comparison workbook:
+
+```bash
+python generate_excel_charts.py
+```
+
+This reads all JSON results from `results/` and produces `results/performance_comparison.xlsx` with:
+- **Overview** — summary table across all benchmarks and machines
+- **Overview Chart** — absolute performance bar charts
+- **LLVM Advantage %** — relative speedup chart
+- **Per-project sheets** — LAME, x264, NumPy, CPython detail with charts
+- **Speedup Ratio** — LLVM/MSVC ratio chart
+
 ## Compiler flags
 
 | | MSVC | LLVM (clang-cl) |
@@ -178,7 +193,7 @@ Analyze traces with [Profile Explorer](https://github.com/niclaslindstedt/profil
 │   └── profiling.py              # ETW/xperf wrappers
 ├── benchmarks/
 │   ├── lame/                     # LAME MP3 encoder
-│   ├── numpy/                    # NumPy count_nonzero
+│   ├── numpy/                    # NumPy sqrt & sort
 │   ├── cpython/                  # CPython pyperformance
 │   └── x264/                    # x264 H.264 encoder
 ├── results/                      # Benchmark output (gitignored)
