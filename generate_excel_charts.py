@@ -14,7 +14,7 @@ from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 
 MACHINES = {
     "gleb-devkit-arm64": "Snapdragon 8cx Gen 3 (Volterra)",
-    "gleb-surface-15-arm64": "Surface Laptop 15 (X Plus)",
+    "gleb-surface-15-arm64": "Surface Laptop 15 (X Elite)",
 }
 RESULTS = Path("results")
 
