@@ -254,7 +254,7 @@ def build(c, toolchain="msvc", platform=config.DEFAULT_PLATFORM):
         )
     else:
         # Retarget from VS2019 (v142) to current VS toolset
-        toolset_arg = '/p:PlatformToolset=v143'
+        toolset_arg = '/p:PlatformToolset=v144'
 
     cmd = (
         f'"{msbuild}" "{LAME_SLN}" '

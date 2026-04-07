@@ -32,12 +32,12 @@ def find_vswhere() -> Path:
     if found:
         return Path(found)
     raise FileNotFoundError(
-        "vswhere.exe not found. Install Visual Studio Build Tools 2022."
+        "vswhere.exe not found. Install Visual Studio Build Tools 2026 (or 2022)."
     )
 
 
 def find_vs_install_path(platform: str | None = None) -> Path:
-    """Return the newest VS 2022+ install path via vswhere."""
+    """Return the newest VS installation path via vswhere."""
     from . import config as _cfg
     platform = platform or _cfg.DEFAULT_PLATFORM
     vswhere = find_vswhere()

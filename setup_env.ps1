@@ -3,7 +3,7 @@
     Environment setup and validation for MSVC vs LLVM benchmarks.
 
 .DESCRIPTION
-    Detects and validates required tools: Visual Studio 2022 with x64 and ARM64 C++ tools,
+    Detects and validates required tools: Visual Studio 2022/2026 with x64 and ARM64 C++ tools,
     LLVM/clang-cl, Python, Git, SVN, Meson, Ninja, CMake, and Windows Performance Toolkit.
     Optionally installs missing tools via winget with the -Install switch.
 
@@ -118,9 +118,15 @@ if ($vswhere) {
         -property installationPath 2>$null | Select-Object -First 1
 }
 
-# Fallback: probe well-known VS 2022 installation paths when vswhere is absent or returned nothing
+# Fallback: probe well-known VS installation paths when vswhere is absent or returned nothing
+# Try VS 2026 (version 18) first, then VS 2022 (version 17)
 if (-not $vsPath) {
     foreach ($root in @(
+        "${env:ProgramFiles(x86)}\Microsoft Visual Studio\18\BuildTools",
+        "$env:ProgramFiles\Microsoft Visual Studio\18\BuildTools",
+        "$env:ProgramFiles\Microsoft Visual Studio\18\Enterprise",
+        "$env:ProgramFiles\Microsoft Visual Studio\18\Professional",
+        "$env:ProgramFiles\Microsoft Visual Studio\18\Community",
         "${env:ProgramFiles(x86)}\Microsoft Visual Studio\2022\BuildTools",
         "$env:ProgramFiles\Microsoft Visual Studio\2022\BuildTools",
         "$env:ProgramFiles\Microsoft Visual Studio\2022\Enterprise",
@@ -169,11 +175,11 @@ if ($vsPath -and $msvcVer) {
         $script:vcvarsallBroken = $true
         Write-Status "vcvarsall.bat" "WARN" "cl.exe found but vcvarsall cannot set up the build environment"
         Write-Host "         -> VC workload incomplete. Open Visual Studio Installer, click Modify on" -ForegroundColor DarkYellow
-        Write-Host "            BuildTools 2022, and enable 'Desktop development with C++' workload." -ForegroundColor DarkYellow
+        Write-Host "            your Build Tools, and enable 'Desktop development with C++' workload." -ForegroundColor DarkYellow
     }
 } else {
-    Write-Status "MSVC $primaryPlatform tools" "MISS" "Visual Studio 2022 with $primaryPlatform C++ workload required"
-    Install-IfMissing "Visual Studio Build Tools" "Microsoft.VisualStudio.2022.BuildTools" $false
+    Write-Status "MSVC $primaryPlatform tools" "MISS" "Visual Studio 2026 (or 2022) with $primaryPlatform C++ workload required"
+    Install-IfMissing "Visual Studio Build Tools" "Microsoft.VisualStudio.2026.BuildTools" $false
 }
 
 # --- Check secondary platform tools (optional) ---
@@ -244,8 +250,13 @@ if ($clangcl) {
 if ($vsPath) {
     foreach ($plat in @($primaryPlatform, $secondaryPlatform)) {
         $msbuildPlat = if ($plat -eq "x64") { "x64" } else { "ARM64" }
-        $toolsetDir = Join-Path $vsPath "MSBuild\Microsoft\VC\v170\Platforms\$msbuildPlat\PlatformToolsets\ClangCL"
-        if (Test-Path $toolsetDir) {
+        # Try v180 (VS 2026) first, then v170 (VS 2022)
+        $toolsetDir = $null
+        foreach ($vcVer in @("v180", "v170")) {
+            $candidate = Join-Path $vsPath "MSBuild\Microsoft\VC\$vcVer\Platforms\$msbuildPlat\PlatformToolsets\ClangCL"
+            if (Test-Path $candidate) { $toolsetDir = $candidate; break }
+        }
+        if ($toolsetDir) {
             Write-Status "ClangCL toolset ($plat)" "OK" "MSBuild integration present"
         } else {
             Write-Status "ClangCL toolset ($plat)" "MISS" "MSBuild cannot use PlatformToolset=ClangCL for $plat"
