@@ -1,6 +1,6 @@
 # MSVC vs LLVM on Windows — Benchmarks
 
-Automated build, benchmark, and profiling framework for comparing MSVC and LLVM (clang-cl) compiler output on Windows across four open-source projects. Supports both **x64** and **ARM64** platforms (ARM64 is the primary target).
+Automated build, benchmark, and profiling framework for comparing MSVC and LLVM (clang-cl) compiler output on **Windows ARM64** across four open-source projects.
 
 ## Projects
 
@@ -13,13 +13,12 @@ Automated build, benchmark, and profiling framework for comparing MSVC and LLVM 
 
 ## Prerequisites
 
-- **Windows** machine (x64 or ARM64)
-- **Visual Studio 2026** (or 2022) with C++ workload (MSVC ≥ 14.50); ARM64 tools needed for `--platform=arm64`
+- **Windows ARM64** machine
+- **Visual Studio 2026** (or 2022) with C++ workload (MSVC ≥ 14.50) and ARM64 tools
 - **LLVM ≥ 21.x** with clang-cl and lld-link
 - **ClangCL MSBuild toolset** — required for LLVM builds of MSBuild projects (LAME, CPython). Install via VS Installer → Individual components → *C++ Clang Compiler for Windows* + *MSBuild support for LLVM (clang-cl) toolset*
-- **Python 3.x** — recommended via [Python Manager](https://github.com/zooba/pymanager) (`winget install 9NQ7512CXL7T`)
-  - ARM64 machines: `pymanager install 3.14-arm64` (native ARM64 Python)
-  - x64 machines: `pymanager install 3.14`
+- **Python 3.x** (native ARM64) — recommended via [Python Manager](https://github.com/zooba/pymanager) (`winget install 9NQ7512CXL7T`)
+  - `pymanager install 3.14-arm64`
 - **Git**, **SVN** (for LAME), **Meson**, **Ninja**, **CMake**
 - **Windows Performance Toolkit** (xperf) for profiling
 - **PowerShell 7+** — required to run `setup_env.ps1`
@@ -53,8 +52,7 @@ Automated build, benchmark, and profiling framework for comparing MSVC and LLVM 
 ```pwsh
 # 0. Install Python via Python Manager (recommended)
     winget install 9NQ7512CXL7T
-    pymanager install 3.14         # x64 machine
-    pymanager install 3.14-arm64   # ARM64 machine
+    pymanager install 3.14-arm64
 
 # 1. Create and activate a virtual environment
 python -m venv .venv
@@ -66,15 +64,12 @@ pip install -r requirements.txt
 # 3. List all available tasks
 inv --list
 
-# 3. Build everything with both toolchains (x64 for verification)
+# 3. Build everything with both toolchains
 inv fetch-all
-inv build-all --toolchain=both --platform=x64
-
-# 3b. Or build for ARM64 (primary target)
-#inv build-all --toolchain=both --platform=arm64
+inv build-all --toolchain=both
 
 # 4. Run all benchmarks
-inv bench-all --platform=x64
+inv bench-all
 
 # 5. Capture ETW profiles
 inv profile-all
@@ -82,15 +77,13 @@ inv profile-all
 
 ## Per-project commands
 
-All build/bench/profile commands accept `--platform=x64` or `--platform=arm64` (default: arm64).
-
 ### LAME MP3
 
 ```bash
 inv lame.fetch                          # SVN checkout r6531
 inv lame.patch                          # Add ARM64 platform + configMS.h fix
-inv lame.build --toolchain=msvc --platform=x64   # Build with MSVC for x64
-inv lame.build --toolchain=llvm --platform=arm64  # Build with clang-cl for ARM64
+inv lame.build --toolchain=msvc         # Build with MSVC for ARM64
+inv lame.build --toolchain=llvm         # Build with clang-cl for ARM64
 inv lame.bench --toolchain=msvc         # Benchmark (20 encoding runs)
 inv lame.profile --toolchain=msvc       # ETW CPU sampling trace
 ```

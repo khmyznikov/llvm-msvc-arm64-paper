@@ -50,18 +50,17 @@ def fetch(c):
     pre=[fetch],
     help={
         "toolchain": "msvc or llvm (default: msvc)",
-        "platform": f"arm64 or x64 (default: {config.DEFAULT_PLATFORM})",
     },
 )
-def build(c, toolchain="msvc", platform=config.DEFAULT_PLATFORM):
-    """Build NumPy with the specified toolchain via Meson."""
-    env = get_toolchain_env(toolchain, platform)
+def build(c, toolchain="msvc"):
+    """Build NumPy with the specified toolchain via Meson (ARM64)."""
+    env = get_toolchain_env(toolchain)
     # Merge current process PATH so venv tools (python, cython) are available
     current_path = os.environ.get("PATH", "")
     env["PATH"] = env.get("PATH", "") + ";" + current_path
-    build_dir = BUILD_DIR / f"{toolchain}_{platform}"
+    build_dir = BUILD_DIR / f"{toolchain}_arm64"
     tc_prefix = "msvc" if toolchain == "msvc" else "clang"
-    native_file = NATIVE_DIR / f"native-{tc_prefix}-{platform}.ini"
+    native_file = NATIVE_DIR / f"native-{tc_prefix}-arm64.ini"
 
     # Clean previous build if exists
     if build_dir.exists():
@@ -89,7 +88,7 @@ def build(c, toolchain="msvc", platform=config.DEFAULT_PLATFORM):
     install_cmd = f'{meson_cmd} install -C "{build_dir}"'
     subprocess.run(install_cmd, shell=True, env=env, check=True)
 
-    print(f"[numpy] Build complete ({toolchain}/{platform}). Output: {build_dir}")
+    print(f"[numpy] Build complete ({toolchain}/arm64). Output: {build_dir}")
 
 
 # ---------------------------------------------------------------------------
@@ -171,15 +170,14 @@ print(json.dumps(output))
 @task(
     help={
         "toolchain": "msvc or llvm (default: msvc)",
-        "platform": f"arm64 or x64 (default: {config.DEFAULT_PLATFORM})",
     },
 )
-def bench(c, toolchain="msvc", platform=config.DEFAULT_PLATFORM):
+def bench(c, toolchain="msvc"):
     """Run NumPy benchmark suite (multiple operations)."""
-    build_dir = BUILD_DIR / f"{toolchain}_{platform}"
+    build_dir = BUILD_DIR / f"{toolchain}_arm64"
     install_dir = build_dir / "install"
     if not install_dir.exists():
-        print(f"[numpy] Build not found. Run 'inv numpy.build --toolchain={toolchain} --platform={platform}' first.")
+        print(f"[numpy] Build not found. Run 'inv numpy.build --toolchain={toolchain}' first.")
         return
 
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
@@ -216,9 +214,9 @@ def bench(c, toolchain="msvc", platform=config.DEFAULT_PLATFORM):
         if line.startswith("{"):
             data = json.loads(line)
             data["toolchain"] = toolchain
-            data["platform"] = platform
+            data["platform"] = "arm64"
             data["machine"] = config.get_machine_info()
-            result_file = RESULTS_DIR / f"numpy_{toolchain}_{platform}.json"
+            result_file = RESULTS_DIR / f"numpy_{toolchain}_arm64.json"
             result_file.write_text(json.dumps(data, indent=2))
             # Print summary
             print(f"[numpy] Benchmark suite complete ({toolchain}):")
@@ -238,19 +236,18 @@ def bench(c, toolchain="msvc", platform=config.DEFAULT_PLATFORM):
 @task(
     help={
         "toolchain": "msvc or llvm (default: msvc)",
-        "platform": f"arm64 or x64 (default: {config.DEFAULT_PLATFORM})",
     },
 )
-def profile(c, toolchain="msvc", platform=config.DEFAULT_PLATFORM):
+def profile(c, toolchain="msvc"):
     """Capture an ETW trace of the NumPy benchmark."""
-    build_dir = BUILD_DIR / f"{toolchain}_{platform}"
+    build_dir = BUILD_DIR / f"{toolchain}_arm64"
     install_dir = build_dir / "install"
     if not install_dir.exists():
-        print(f"[numpy] Build not found. Run 'inv numpy.build --toolchain={toolchain} --platform={platform}' first.")
+        print(f"[numpy] Build not found. Run 'inv numpy.build --toolchain={toolchain}' first.")
         return
 
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
-    env = get_toolchain_env(toolchain, platform)
+    env = get_toolchain_env(toolchain)
 
     site_pkgs = None
     for sp in install_dir.rglob("numpy"):
@@ -261,7 +258,7 @@ def profile(c, toolchain="msvc", platform=config.DEFAULT_PLATFORM):
         env["PYTHONPATH"] = str(site_pkgs)
 
     script = _BENCH_SCRIPT.format(size=config.NUMPY_BENCH_SIZE)
-    etl_file = RESULTS_DIR / f"numpy_{toolchain}_{platform}.etl"
+    etl_file = RESULTS_DIR / f"numpy_{toolchain}_arm64.etl"
     profile_command(
         ["python", "-c", script],
         output_etl=etl_file,

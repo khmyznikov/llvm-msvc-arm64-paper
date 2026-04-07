@@ -36,18 +36,11 @@ def find_vswhere() -> Path:
     )
 
 
-def find_vs_install_path(platform: str | None = None) -> Path:
-    """Return the newest VS installation path via vswhere."""
-    from . import config as _cfg
-    platform = platform or _cfg.DEFAULT_PLATFORM
+def find_vs_install_path() -> Path:
+    """Return the newest VS installation path via vswhere (ARM64 tools required)."""
     vswhere = find_vswhere()
 
-    # Try with platform-specific component first
-    component = (
-        "Microsoft.VisualStudio.Component.VC.Tools.ARM64"
-        if platform == "arm64"
-        else "Microsoft.VisualStudio.Component.VC.Tools.x86.x64"
-    )
+    component = "Microsoft.VisualStudio.Component.VC.Tools.ARM64"
     out = _run([
         str(vswhere),
         "-latest",
@@ -57,33 +50,29 @@ def find_vs_install_path(platform: str | None = None) -> Path:
     ])
     if not out:
         raise FileNotFoundError(
-            f"No Visual Studio installation with {platform} C++ tools found."
+            "No Visual Studio installation with ARM64 C++ tools found."
         )
     return Path(out.splitlines()[0])
 
 
-def find_vcvarsall(platform: str | None = None) -> Path:
+def find_vcvarsall() -> Path:
     """Return path to vcvarsall.bat."""
-    vs_path = find_vs_install_path(platform)
+    vs_path = find_vs_install_path()
     vcvars = vs_path / "VC" / "Auxiliary" / "Build" / "vcvarsall.bat"
     if not vcvars.exists():
         raise FileNotFoundError(f"vcvarsall.bat not found at {vcvars}")
     return vcvars
 
 
-def get_msvc_env(arch: str = "arm64") -> dict[str, str]:
+def get_msvc_env() -> dict[str, str]:
     """Run vcvarsall.bat and capture the resulting environment variables.
-
-    Args:
-        arch: vcvarsall architecture argument ("arm64" or "x64").
 
     Returns a dict suitable for passing to subprocess.run(env=...).
     """
-    platform = "arm64" if arch == "arm64" else "x64"
-    vcvars = find_vcvarsall(platform)
+    vcvars = find_vcvarsall()
     # Run vcvarsall then dump env as JSON via python one-liner
     cmd = (
-        f'cmd /c ""{vcvars}" {arch} >nul 2>&1 && '
+        f'cmd /c ""{vcvars}" arm64 >nul 2>&1 && '
         f'python -c "import os,json;print(json.dumps(dict(os.environ)))""'
     )
     out = _run(cmd, shell=True)
@@ -180,17 +169,14 @@ def find_lld_link() -> Path:
 # High-level helpers
 # ---------------------------------------------------------------------------
 
-def get_toolchain_env(toolchain: str, platform: str | None = None) -> dict[str, str]:
+def get_toolchain_env(toolchain: str) -> dict[str, str]:
     """Return environment dict for the given toolchain ('msvc' or 'llvm').
 
-    For MSVC: full vcvarsall environment.
+    For MSVC: full vcvarsall environment (ARM64).
     For LLVM: vcvarsall environment + LLVM bin in PATH (clang-cl needs
               Windows SDK headers/libs from MSVC env).
     """
-    from . import config as _cfg
-    platform = platform or _cfg.DEFAULT_PLATFORM
-    arch = _cfg.platform_info(platform)["vcvars"]
-    env = get_msvc_env(arch)
+    env = get_msvc_env()
     if toolchain == "llvm":
         clangcl = find_clangcl()
         llvm_bin = str(clangcl.parent)
@@ -198,9 +184,9 @@ def get_toolchain_env(toolchain: str, platform: str | None = None) -> dict[str, 
     return env
 
 
-def run_in_env(cmd, toolchain: str = "msvc", platform: str | None = None, cwd=None, check=True, **kw):
+def run_in_env(cmd, toolchain: str = "msvc", cwd=None, check=True, **kw):
     """Run a command within the appropriate toolchain environment."""
-    env = get_toolchain_env(toolchain, platform)
+    env = get_toolchain_env(toolchain)
     if isinstance(cmd, str):
         return subprocess.run(
             cmd, shell=True, env=env, cwd=cwd, check=check, **kw

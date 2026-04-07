@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  MSBuild property override for LAME builds (ARM64 and x64).
+  MSBuild property override for LAME builds (ARM64).
   Import via /p:ForceImportBeforeCppTargets="path/to/vs2019_override.props"
 -->
 <Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">

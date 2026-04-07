@@ -57,22 +57,12 @@ Write-Host "=============================================" -ForegroundColor Cyan
 Write-Host " MSVC vs LLVM Benchmark - Env Check"
 Write-Host "=============================================" -ForegroundColor Cyan
 
-# Detect host architecture
+# Target platform: ARM64 only
 $hostArch = [System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture.ToString().ToLower()
-if ($hostArch -eq "arm64") {
-    $primaryPlatform = "arm64"
-    $primaryComponent = "Microsoft.VisualStudio.Component.VC.Tools.ARM64"
-    $primaryVcvarsArg = "arm64"
-    $secondaryPlatform = "x64"
-    $secondaryComponent = "Microsoft.VisualStudio.Component.VC.Tools.x86.x64"
-} else {
-    $primaryPlatform = "x64"
-    $primaryComponent = "Microsoft.VisualStudio.Component.VC.Tools.x86.x64"
-    $primaryVcvarsArg = "x64"
-    $secondaryPlatform = "arm64"
-    $secondaryComponent = "Microsoft.VisualStudio.Component.VC.Tools.ARM64"
-}
-Write-Host " Host: $hostArch  |  Primary: $primaryPlatform  |  Secondary: $secondaryPlatform"
+$primaryPlatform = "arm64"
+$primaryComponent = "Microsoft.VisualStudio.Component.VC.Tools.ARM64"
+$primaryVcvarsArg = "arm64"
+Write-Host " Host: $hostArch  |  Target: ARM64"
 Write-Host "=============================================" -ForegroundColor Cyan
 Write-Host ""
 
@@ -182,16 +172,6 @@ if ($vsPath -and $msvcVer) {
     Install-IfMissing "Visual Studio Build Tools" "Microsoft.VisualStudio.2026.BuildTools" $false
 }
 
-# --- Check secondary platform tools (optional) ---
-if ($vsPath) {
-    $secondaryCl = Find-ClExe $vsPath $secondaryPlatform
-    if ($secondaryCl) {
-        Write-Status "MSVC $secondaryPlatform tools (cross)" "OK" "available for --platform=$secondaryPlatform"
-    } else {
-        Write-Status "MSVC $secondaryPlatform tools (cross)" "WARN" "Not installed — needed for --platform=$secondaryPlatform"
-    }
-}
-
 # -----------------------------------------------------------------------
 # 2. LLVM / clang-cl
 # -----------------------------------------------------------------------
@@ -206,7 +186,6 @@ $llvmPaths = @(
 )
 if ($vsPath) {
     $llvmPaths += Join-Path $vsPath "VC\Tools\Llvm\ARM64\bin\clang-cl.exe"
-    $llvmPaths += Join-Path $vsPath "VC\Tools\Llvm\x64\bin\clang-cl.exe"
 }
 
 foreach ($p in $llvmPaths) {
@@ -248,21 +227,19 @@ if ($clangcl) {
 
 # Check ClangCL MSBuild toolset integration (required for MSBuild /p:PlatformToolset=ClangCL)
 if ($vsPath) {
-    foreach ($plat in @($primaryPlatform, $secondaryPlatform)) {
-        $msbuildPlat = if ($plat -eq "x64") { "x64" } else { "ARM64" }
-        # Try v180 (VS 2026) first, then v170 (VS 2022)
-        $toolsetDir = $null
-        foreach ($vcVer in @("v180", "v170")) {
-            $candidate = Join-Path $vsPath "MSBuild\Microsoft\VC\$vcVer\Platforms\$msbuildPlat\PlatformToolsets\ClangCL"
-            if (Test-Path $candidate) { $toolsetDir = $candidate; break }
-        }
-        if ($toolsetDir) {
-            Write-Status "ClangCL toolset ($plat)" "OK" "MSBuild integration present"
-        } else {
-            Write-Status "ClangCL toolset ($plat)" "MISS" "MSBuild cannot use PlatformToolset=ClangCL for $plat"
-            Write-Host "         -> Open Visual Studio Installer -> Modify -> Individual components" -ForegroundColor DarkYellow
-            Write-Host "         -> Install 'C++ Clang Compiler for Windows' and 'MSBuild support for LLVM (clang-cl) toolset'" -ForegroundColor DarkYellow
-        }
+    # Check ARM64 ClangCL toolset
+    # Try v180 (VS 2026) first, then v170 (VS 2022)
+    $toolsetDir = $null
+    foreach ($vcVer in @("v180", "v170")) {
+        $candidate = Join-Path $vsPath "MSBuild\Microsoft\VC\$vcVer\Platforms\ARM64\PlatformToolsets\ClangCL"
+        if (Test-Path $candidate) { $toolsetDir = $candidate; break }
+    }
+    if ($toolsetDir) {
+        Write-Status "ClangCL toolset (arm64)" "OK" "MSBuild integration present"
+    } else {
+        Write-Status "ClangCL toolset (arm64)" "MISS" "MSBuild cannot use PlatformToolset=ClangCL for ARM64"
+        Write-Host "         -> Open Visual Studio Installer -> Modify -> Individual components" -ForegroundColor DarkYellow
+        Write-Host "         -> Install 'C++ Clang Compiler for Windows' and 'MSBuild support for LLVM (clang-cl) toolset'" -ForegroundColor DarkYellow
     }
 }
 
@@ -287,9 +264,9 @@ if ($pythonOk) {
     } else { "x86" }
     Write-Status "Python" "OK" "v$pyVer ($pyArchLabel)"
 
-    # Warn if Python arch doesn't match host
-    if ($hostArch -eq "arm64" -and $pyArchLabel -ne "arm64") {
-        Write-Status "Python (native)" "WARN" "Running $pyArchLabel Python on $hostArch host — consider native arm64 Python for benchmarks"
+    # Warn if Python is not native ARM64
+    if ($pyArchLabel -ne "arm64") {
+        Write-Status "Python (native)" "WARN" "Running $pyArchLabel Python — native arm64 Python required for benchmarks"
         if ($pymanagerOk) {
             Write-Host "         -> Install native: pymanager install 3.14-arm64" -ForegroundColor DarkYellow
         }
@@ -299,18 +276,13 @@ if ($pythonOk) {
     if ($pymanagerOk) {
         if ($Install) {
             Write-Host "         -> Installing Python via pymanager..." -ForegroundColor Cyan
-            if ($hostArch -eq "arm64") {
-                & pymanager install "3.14-arm64"
-            } else {
-                & pymanager install "3.14"
-            }
+            & pymanager install "3.14-arm64"
         } else {
-            $pyTag = if ($hostArch -eq "arm64") { "3.14-arm64" } else { "3.14" }
-            Write-Host "         -> Install with: pymanager install $pyTag" -ForegroundColor DarkYellow
+            Write-Host "         -> Install with: pymanager install 3.14-arm64" -ForegroundColor DarkYellow
         }
     } else {
         Install-IfMissing "Python Manager" "9NQ7512CXL7T" $false
-        Write-Host "         -> Then: pymanager install 3.14" -ForegroundColor DarkYellow
+        Write-Host "         -> Then: pymanager install 3.14-arm64" -ForegroundColor DarkYellow
     }
 }
 

@@ -23,51 +23,48 @@ def fetch_all(c, toolchain="both"):
 @task(
     help={
         "toolchain": "msvc, llvm, or both (default: both)",
-        "platform": "arm64 or x64 (default: arm64)",
     }
 )
-def build_all(c, toolchain="both", platform="arm64"):
+def build_all(c, toolchain="both"):
     """Build all projects with the specified toolchain."""
     toolchains = ["msvc", "llvm"] if toolchain == "both" else [toolchain]
     for tc in toolchains:
-        c.run(f"inv lame.build --toolchain={tc} --platform={platform}", pty=False)
-        c.run(f"inv numpy.build --toolchain={tc} --platform={platform}", pty=False)
-        c.run(f"inv cpython.build --toolchain={tc} --platform={platform}", pty=False)
-        c.run(f"inv x264.build --toolchain={tc} --platform={platform}", pty=False)
-    print(f"[all] All projects built ({toolchain}/{platform}).")
+        c.run(f"inv lame.build --toolchain={tc}", pty=False)
+        c.run(f"inv numpy.build --toolchain={tc}", pty=False)
+        c.run(f"inv cpython.build --toolchain={tc}", pty=False)
+        c.run(f"inv x264.build --toolchain={tc}", pty=False)
+    print(f"[all] All projects built ({toolchain}/arm64).")
 
 
 @task(
     help={
         "toolchain": "msvc, llvm, or both (default: both)",
-        "platform": "arm64 or x64 (default: arm64)",
     }
 )
-def bench_all(c, toolchain="both", platform="arm64"):
+def bench_all(c, toolchain="both"):
     """Run benchmarks for all projects."""
     toolchains = ["msvc", "llvm"] if toolchain == "both" else [toolchain]
     for tc in toolchains:
-        c.run(f"inv lame.bench --toolchain={tc} --platform={platform}", pty=False)
-        c.run(f"inv numpy.bench --toolchain={tc} --platform={platform}", pty=False)
-        c.run(f"inv cpython.bench --toolchain={tc} --platform={platform}", pty=False)
-        c.run(f"inv x264.bench --toolchain={tc} --platform={platform}", pty=False)
-    print(f"[all] All benchmarks complete ({toolchain}/{platform}).")
+        c.run(f"inv lame.bench --toolchain={tc}", pty=False)
+        c.run(f"inv numpy.bench --toolchain={tc}", pty=False)
+        c.run(f"inv cpython.bench --toolchain={tc}", pty=False)
+        c.run(f"inv x264.bench --toolchain={tc}", pty=False)
+    print(f"[all] All benchmarks complete ({toolchain}/arm64).")
 
 
 @task(
     help={
         "toolchain": "msvc, llvm, or both (default: both)",
-        "platform": "arm64 or x64 (default: arm64)",
     }
 )
-def profile_all(c, toolchain="both", platform="arm64"):
+def profile_all(c, toolchain="both"):
     """Capture ETW profiles for all projects."""
     toolchains = ["msvc", "llvm"] if toolchain == "both" else [toolchain]
     for tc in toolchains:
-        c.run(f"inv lame.profile --toolchain={tc} --platform={platform}", pty=False)
-        c.run(f"inv cpython.profile --toolchain={tc} --platform={platform}", pty=False)
-        c.run(f"inv x264.profile --toolchain={tc} --platform={platform}", pty=False)
-    print(f"[all] All profiles captured ({toolchain}/{platform}).")
+        c.run(f"inv lame.profile --toolchain={tc}", pty=False)
+        c.run(f"inv cpython.profile --toolchain={tc}", pty=False)
+        c.run(f"inv x264.profile --toolchain={tc}", pty=False)
+    print(f"[all] All profiles captured ({toolchain}/arm64).")
 
 
 # Build the namespace

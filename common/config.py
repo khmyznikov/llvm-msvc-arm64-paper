@@ -9,33 +9,22 @@ from pathlib import Path
 # ---------------------------------------------------------------------------
 # Platform support
 # ---------------------------------------------------------------------------
-DEFAULT_PLATFORM = "arm64"  # Primary target; use "x64" for verification
+PLATFORM = "arm64"  # Only ARM64 is supported
 
-# Map our platform names to various tool-specific identifiers
-PLATFORM_MAP = {
-    "arm64": {
-        "vcvars": "arm64",          # vcvarsall.bat argument
-        "msbuild": "ARM64",         # MSBuild /p:Platform value
-        "meson_cpu": "aarch64",     # Meson cpu_family
-        "cmake_arch": "ARM64",      # CMake -A value
-        "clang_target": "aarch64-pc-windows-msvc",
-        "pcbuild": "arm64",         # CPython PCbuild output dir name
-    },
-    "x64": {
-        "vcvars": "x64",
-        "msbuild": "x64",
-        "meson_cpu": "x86_64",
-        "cmake_arch": "x64",
-        "clang_target": "x86_64-pc-windows-msvc",
-        "pcbuild": "amd64",
-    },
+# Platform identifiers for various tools
+PLATFORM_INFO = {
+    "vcvars": "arm64",          # vcvarsall.bat argument
+    "msbuild": "ARM64",         # MSBuild /p:Platform value
+    "meson_cpu": "aarch64",     # Meson cpu_family
+    "cmake_arch": "ARM64",      # CMake -A value
+    "clang_target": "aarch64-pc-windows-msvc",
+    "pcbuild": "arm64",         # CPython PCbuild output dir name
 }
 
 
-def platform_info(platform: str | None = None) -> dict:
-    """Return platform identifiers dict for the given platform."""
-    platform = platform or DEFAULT_PLATFORM
-    return PLATFORM_MAP[platform]
+def platform_info() -> dict:
+    """Return platform identifiers dict."""
+    return PLATFORM_INFO
 
 # ---------------------------------------------------------------------------
 # Machine identification (for multi-machine result storage)

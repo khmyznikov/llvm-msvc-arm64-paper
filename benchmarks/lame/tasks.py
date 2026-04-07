@@ -220,20 +220,17 @@ def _patch_sln_for_arm64():
     pre=[patch],
     help={
         "toolchain": "msvc or llvm (default: msvc)",
-        "platform": f"arm64 or x64 (default: {config.DEFAULT_PLATFORM})",
     },
 )
-def build(c, toolchain="msvc", platform=config.DEFAULT_PLATFORM):
-    """Build LAME with the specified toolchain and platform."""
-    # ARM64 needs extra patching (x64 configs already exist in the VS2019 solution)
-    if platform == "arm64":
-        patch_arm64(c)
+def build(c, toolchain="msvc"):
+    """Build LAME with the specified toolchain (ARM64)."""
+    patch_arm64(c)
 
-    pinfo = config.platform_info(platform)
-    env = get_toolchain_env(toolchain, platform)
+    pinfo = config.platform_info()
+    env = get_toolchain_env(toolchain)
     msbuild = find_msbuild(env)
 
-    out_dir = BENCH_DIR / f"{toolchain}_{platform}"
+    out_dir = BENCH_DIR / f"{toolchain}_arm64"
     out_dir.mkdir(parents=True, exist_ok=True)
 
     override_prop = str(OVERRIDE_PROPS).replace("\\", "/")
@@ -254,7 +251,7 @@ def build(c, toolchain="msvc", platform=config.DEFAULT_PLATFORM):
         )
     else:
         # Retarget from VS2019 (v142) to current VS toolset
-        toolset_arg = '/p:PlatformToolset=v144'
+        toolset_arg = '/p:PlatformToolset=v145'
 
     cmd = (
         f'"{msbuild}" "{LAME_SLN}" '
@@ -269,7 +266,7 @@ def build(c, toolchain="msvc", platform=config.DEFAULT_PLATFORM):
     # Capture build log
     BUILD_LOGS_DIR.mkdir(parents=True, exist_ok=True)
     ts = config.make_timestamp()
-    log_file = BUILD_LOGS_DIR / f"{toolchain}_{platform}-build-{ts}.txt"
+    log_file = BUILD_LOGS_DIR / f"{toolchain}_arm64-build-{ts}.txt"
 
     result = subprocess.run(cmd, shell=True, env=env, capture_output=True, text=True)
     log_file.write_text(
@@ -288,7 +285,7 @@ def build(c, toolchain="msvc", platform=config.DEFAULT_PLATFORM):
         for pdb in out_dir.glob("*.pdb"):
             break  # at least one PDB present
 
-    print(f"[lame] Build complete ({toolchain}/{platform}). Output: {out_dir}")
+    print(f"[lame] Build complete ({toolchain}/arm64). Output: {out_dir}")
 
 
 # ---------------------------------------------------------------------------
@@ -343,16 +340,15 @@ def _ensure_wav():
 @task(
     help={
         "toolchain": "msvc or llvm (default: msvc)",
-        "platform": f"arm64 or x64 (default: {config.DEFAULT_PLATFORM})",
         "runs": f"Number of runs (default: {config.LAME_BENCH_RUNS})",
     },
 )
-def bench(c, toolchain="msvc", platform=config.DEFAULT_PLATFORM, runs=config.LAME_BENCH_RUNS):
+def bench(c, toolchain="msvc", runs=config.LAME_BENCH_RUNS):
     """Benchmark LAME encoding: pts-trondheim.wav to MP3, --preset extreme."""
-    out_dir = BENCH_DIR / f"{toolchain}_{platform}"
+    out_dir = BENCH_DIR / f"{toolchain}_arm64"
     lame_exe = out_dir / "lame.exe"
     if not lame_exe.exists():
-        print(f"[lame] {lame_exe} not found. Run 'inv lame.build --toolchain={toolchain} --platform={platform}' first.")
+        print(f"[lame] {lame_exe} not found. Run 'inv lame.build --toolchain={toolchain}' first.")
         return
 
     wav_file = _ensure_wav()
@@ -390,12 +386,12 @@ def bench(c, toolchain="msvc", platform=config.DEFAULT_PLATFORM, runs=config.LAM
         out_mp3.unlink(missing_ok=True)
         print(f"  Run {i}/{runs}: {elapsed:.3f}s")
 
-    result_file = RESULTS_DIR / f"lame_{toolchain}_{platform}.json"
+    result_file = RESULTS_DIR / f"lame_{toolchain}_arm64.json"
     result_data = {
         "benchmark": "lame_mp3",
         "machine": config.get_machine_info(),
         "toolchain": toolchain,
-        "platform": platform,
+        "platform": "arm64",
         "runs": runs,
         "preset": config.LAME_PRESET,
         "times_sec": results,
@@ -415,23 +411,22 @@ def bench(c, toolchain="msvc", platform=config.DEFAULT_PLATFORM, runs=config.LAM
 @task(
     help={
         "toolchain": "msvc or llvm (default: msvc)",
-        "platform": f"arm64 or x64 (default: {config.DEFAULT_PLATFORM})",
     },
 )
-def profile(c, toolchain="msvc", platform=config.DEFAULT_PLATFORM):
+def profile(c, toolchain="msvc"):
     """Capture an ETW CPU sampling trace of a LAME encoding run."""
-    out_dir = BENCH_DIR / f"{toolchain}_{platform}"
+    out_dir = BENCH_DIR / f"{toolchain}_arm64"
     lame_exe = out_dir / "lame.exe"
     if not lame_exe.exists():
-        print(f"[lame] {lame_exe} not found. Run 'inv lame.build --toolchain={toolchain} --platform={platform}' first.")
+        print(f"[lame] {lame_exe} not found. Run 'inv lame.build --toolchain={toolchain}' first.")
         return
 
     wav_file = _ensure_wav()
     out_mp3 = out_dir / "profile_output.mp3"
-    etl_file = RESULTS_DIR / f"lame_{toolchain}_{platform}.etl"
+    etl_file = RESULTS_DIR / f"lame_{toolchain}_arm64.etl"
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
 
-    env = get_toolchain_env(toolchain, platform)
+    env = get_toolchain_env(toolchain)
 
     lame_cmd = [
         str(lame_exe),

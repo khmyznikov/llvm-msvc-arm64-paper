@@ -184,13 +184,13 @@ def _src_paths(file_list: list[str]) -> list[str]:
     return [f'"{X264_SRC / s}"' for s in file_list if (X264_SRC / s).exists()]
 
 
-def _build_msvc(env, platform):
+def _build_msvc(env):
     """Build x264 with MSVC cl.exe.
 
     Compiles each source file to a uniquely-named .obj (prefixed by subdir)
     to avoid collisions (common/macroblock.c vs encoder/macroblock.c).
     """
-    build_dir = BUILD_DIR / f"msvc_{platform}"
+    build_dir = BUILD_DIR / "msvc_arm64"
     _write_config_headers(build_dir)
     out_exe = build_dir / "x264.exe"
 
@@ -217,13 +217,13 @@ def _build_msvc(env, platform):
         f'/DEBUG /DEBUGTYPE:FIXUP,CV shell32.lib {" ".join(obj_files)}'
     )
     subprocess.run(link_cmd, shell=True, env=env, check=True, cwd=str(build_dir))
-    print(f"[x264] Built {out_exe.name} (msvc/{platform})")
+    print(f"[x264] Built {out_exe.name} (msvc/arm64)")
     return out_exe
 
 
-def _build_llvm(env, platform):
+def _build_llvm(env):
     """Build x264 with clang-cl."""
-    build_dir = BUILD_DIR / f"llvm_{platform}"
+    build_dir = BUILD_DIR / "llvm_arm64"
     _write_config_headers(build_dir)
     out_exe = build_dir / "x264.exe"
 
@@ -255,7 +255,7 @@ def _build_llvm(env, platform):
         f'/DEBUG shell32.lib {" ".join(obj_files)}'
     )
     subprocess.run(link_cmd, shell=True, env=env, check=True, cwd=str(build_dir))
-    print(f"[x264] Built {out_exe.name} (llvm/{platform})")
+    print(f"[x264] Built {out_exe.name} (llvm/arm64)")
     return out_exe
 
 
@@ -263,25 +263,24 @@ def _build_llvm(env, platform):
     pre=[fetch],
     help={
         "toolchain": "msvc, llvm, or both (default: msvc)",
-        "platform": f"arm64 or x64 (default: {config.DEFAULT_PLATFORM})",
     },
 )
-def build(c, toolchain="msvc", platform=config.DEFAULT_PLATFORM):
-    """Build x264 encoder (pure C, no ASM)."""
+def build(c, toolchain="msvc"):
+    """Build x264 encoder (pure C, no ASM, ARM64)."""
     toolchains = ["msvc", "llvm"] if toolchain == "both" else [toolchain]
     for tc in toolchains:
-        env = get_toolchain_env(tc, platform)
+        env = get_toolchain_env(tc)
         if tc == "msvc":
-            _build_msvc(env, platform)
+            _build_msvc(env)
         else:
-            _build_llvm(env, platform)
+            _build_llvm(env)
 
 
 # ---------------------------------------------------------------------------
 # Test input generation
 # ---------------------------------------------------------------------------
 
-def _ensure_test_input(platform) -> Path:
+def _ensure_test_input() -> Path:
     """Generate a synthetic raw YUV420p test file if not present."""
     test_dir = BUILD_DIR / "testdata"
     test_dir.mkdir(parents=True, exist_ok=True)
@@ -325,21 +324,20 @@ def _ensure_test_input(platform) -> Path:
 @task(
     help={
         "toolchain": "msvc, llvm, or both (default: both)",
-        "platform": f"arm64 or x64 (default: {config.DEFAULT_PLATFORM})",
     },
 )
-def bench(c, toolchain="both", platform=config.DEFAULT_PLATFORM):
+def bench(c, toolchain="both"):
     """Benchmark x264 encoding speed (fps) on a synthetic test input."""
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
     toolchains = ["msvc", "llvm"] if toolchain == "both" else [toolchain]
-    yuv_file = _ensure_test_input(platform)
+    yuv_file = _ensure_test_input()
 
     w, h = config.X264_INPUT_WIDTH, config.X264_INPUT_HEIGHT
     n = config.X264_INPUT_FRAMES
     results = {}
 
     for tc in toolchains:
-        build_dir = BUILD_DIR / f"{tc}_{platform}"
+        build_dir = BUILD_DIR / f"{tc}_arm64"
         exe = build_dir / "x264.exe"
         if not exe.exists():
             print(f"[x264] {exe} not found. Run 'inv x264.build --toolchain={tc}' first.")
@@ -399,11 +397,11 @@ def bench(c, toolchain="both", platform=config.DEFAULT_PLATFORM):
         if fps_values:
             print(f"  [{tc}] Mean: {results[tc]['mean_fps']:.2f} fps")
 
-    result_file = RESULTS_DIR / f"x264_results_{platform}.json"
+    result_file = RESULTS_DIR / "x264_results_arm64.json"
     result_json = {
         "benchmark": "x264_encode",
         "machine": config.get_machine_info(),
-        "platform": platform,
+        "platform": "arm64",
         "input": {
             "width": w,
             "height": h,
@@ -426,18 +424,17 @@ def bench(c, toolchain="both", platform=config.DEFAULT_PLATFORM):
 @task(
     help={
         "toolchain": "msvc or llvm (default: msvc)",
-        "platform": f"arm64 or x64 (default: {config.DEFAULT_PLATFORM})",
     },
 )
-def profile(c, toolchain="msvc", platform=config.DEFAULT_PLATFORM):
+def profile(c, toolchain="msvc"):
     """Capture an ETW CPU sampling trace of x264 encoding."""
-    build_dir = BUILD_DIR / f"{toolchain}_{platform}"
+    build_dir = BUILD_DIR / f"{toolchain}_arm64"
     exe = build_dir / "x264.exe"
     if not exe.exists():
         print(f"[x264] {exe} not found. Build first.")
         return
 
-    yuv_file = _ensure_test_input(platform)
+    yuv_file = _ensure_test_input()
     w, h = config.X264_INPUT_WIDTH, config.X264_INPUT_HEIGHT
     n = config.X264_INPUT_FRAMES
     out_h264 = build_dir / "profile_output.h264"
@@ -452,5 +449,5 @@ def profile(c, toolchain="msvc", platform=config.DEFAULT_PLATFORM):
         "--output", str(out_h264),
         str(yuv_file),
     ]
-    trace_file = RESULTS_DIR / f"xperf_x264_{toolchain}_{platform}.etl"
+    trace_file = RESULTS_DIR / f"xperf_x264_{toolchain}_arm64.etl"
     profile_command(cmd, trace_file, f"x264 ({toolchain})")
