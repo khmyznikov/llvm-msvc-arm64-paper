@@ -117,6 +117,9 @@ def _build_cmd(toolchain, pgo=False):
             versions = sorted(lib_clang.iterdir(), reverse=True)
             if versions:
                 cmd += f' "/p:LLVMToolsVersion={versions[0].name}"'
+    else:
+        # Retarget from CPython's default toolset (v143/VS2022) to current VS
+        cmd += ' "/p:PlatformToolset=v145"'
     return cmd
 
 
