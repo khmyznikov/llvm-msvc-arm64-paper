@@ -21,46 +21,46 @@
     "msvc": {
       "runs": [
         {
-          "elapsed_sec": 96.95415350000258,
-          "fps": 3.14,
+          "elapsed_sec": 87.97804749989882,
+          "fps": 3.47,
           "returncode": 0
         },
         {
-          "elapsed_sec": 105.22422839998035,
-          "fps": 2.85,
+          "elapsed_sec": 86.0537737000268,
+          "fps": 3.49,
           "returncode": 0
         },
         {
-          "elapsed_sec": 91.18234490000759,
-          "fps": 3.29,
+          "elapsed_sec": 86.49484920012765,
+          "fps": 3.47,
           "returncode": 0
         }
       ],
-      "mean_fps": 3.0933333333333337,
-      "min_fps": 2.85,
-      "max_fps": 3.29
+      "mean_fps": 3.4766666666666666,
+      "min_fps": 3.47,
+      "max_fps": 3.49
     },
     "llvm": {
       "runs": [
         {
-          "elapsed_sec": 69.0544989000191,
-          "fps": 4.48,
+          "elapsed_sec": 67.49319229996763,
+          "fps": 4.52,
           "returncode": 0
         },
         {
-          "elapsed_sec": 66.99248049999005,
-          "fps": 4.48,
+          "elapsed_sec": 66.84641909995116,
+          "fps": 4.49,
           "returncode": 0
         },
         {
-          "elapsed_sec": 67.97418370001833,
-          "fps": 4.42,
+          "elapsed_sec": 66.40755279990844,
+          "fps": 4.52,
           "returncode": 0
         }
       ],
-      "mean_fps": 4.46,
-      "min_fps": 4.42,
-      "max_fps": 4.48
+      "mean_fps": 4.51,
+      "min_fps": 4.49,
+      "max_fps": 4.52
     }
   }
 }
