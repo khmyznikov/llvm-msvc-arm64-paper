@@ -256,6 +256,8 @@ def build(c, toolchain="msvc"):
     else:
         # Retarget from VS2019 (v142) to current VS toolset
         toolset_arg = '/p:PlatformToolset=v145'
+        if getattr(config, 'MSVC_PREVIEW_TOOLSET', False):
+            toolset_arg += ' /p:MSVCPreviewEnabled=true'
 
     cmd = (
         f'"{msbuild}" "{LAME_SLN}" '

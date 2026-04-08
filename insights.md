@@ -17,11 +17,11 @@ Collected from benchmark runs on two ARM64 Windows machines:
 
 | Benchmark | MSVC | LLVM | LLVM Advantage |
 |-----------|------|------|----------------|
-| **LAME MP3** (encode) | 1.143s mean | 0.810s mean | **+29.1% faster** |
+| **LAME MP3** (encode) | 1.104s mean | 0.810s mean | **+26.6% faster** |
 | **NumPy sqrt** | 4.322ms mean | 4.209ms mean | **+2.6% faster** |
 | **NumPy sort** | 82.28ms mean | 42.66ms mean | **+48.2% faster** |
 | **x264** (H.264 encode) | 3.74 fps | 4.48 fps | **+19.6% faster** |
-| **CPython** (geo-mean) | 76.32ms | 59.29ms | **+22.3% faster** |
+| **CPython** (geo-mean) | 78.20ms | 59.29ms | **+24.2% faster** |
 
 ### Surface Laptop 15 — Snapdragon X Elite (X1E80100)
 
@@ -33,7 +33,7 @@ Collected from benchmark runs on two ARM64 Windows machines:
 | **x264** (H.264 encode) | 7.74 fps | 10.02 fps | **+29.4% faster** |
 | **CPython** (geo-mean) | 49.79ms | 32.11ms | **+35.5% faster** |
 
-**Overall finding**: LLVM/Clang produces **consistently and significantly faster code** than MSVC for ARM64 Windows across both platforms, with advantages ranging from **20% to 60%** depending on the workload. The Volterra now uses MSVC v14.51, while the Surface 15 uses v14.50. On the Volterra, v14.51 **significantly improved x264 codegen** (gap narrowed from 30% to 20%) but **reverted the dramatic sqrt optimization** from v14.50 (MSVC lost its 30% sqrt lead, now 2.6% slower than LLVM). On the Surface 15 (X Elite), the LLVM advantage remains consistently large (27–44% on CPython, 33% on LAME, 59% on sort). CPython on Volterra was not rebuilt with v14.51 (still compiled with v14.50).
+**Overall finding**: LLVM/Clang produces **consistently and significantly faster code** than MSVC for ARM64 Windows across both platforms, with advantages ranging from **20% to 60%** depending on the workload. The Volterra now uses MSVC v14.51 across all benchmarks, while the Surface 15 uses v14.50. On the Volterra, v14.51 **improved LAME** (1.104s vs 1.143s with v14.50) and **x264 codegen** (gap narrowed from 30% to 20%), but **reverted the dramatic sqrt optimization** from v14.50 and **slightly regressed CPython** (78.20ms geo-mean vs 76.32ms). On the Surface 15 (X Elite), the LLVM advantage remains consistently large (27–44% on CPython, 33% on LAME, 59% on sort).
 
 ---
 
@@ -45,10 +45,10 @@ Collected from benchmark runs on two ARM64 Windows machines:
 
 | Machine | MSVC mean | LLVM mean | LLVM Advantage |
 |---------|-----------|-----------|----------------|
-| Volterra (8cx Gen 3) | 1.143s (min 1.128, max 1.165) | 0.810s (min 0.802, max 0.825) | +29.1% |
+| Volterra (8cx Gen 3) | 1.104s (min 1.088, max 1.118) | 0.810s (min 0.802, max 0.825) | +26.6% |
 | Surface 15 (X Elite) | 0.599s (min 0.594, max 0.609) | 0.402s (min 0.395, max 0.413) | +32.9% |
 
-- **Key insight**: LAME is a float-heavy, loop-intensive encoder. LLVM's ARM64 backend generates better instruction scheduling and vectorization for the core DCT/psychoacoustic model loops. LLVM also shows tighter variance (more consistent performance). On Volterra, MSVC v14.51 is slightly slower than v14.50 on this workload (1.143s vs 1.135s), continuing the regression trend from v14.44 (1.108s). On the Surface 15, MSVC v14.50 also regressed vs v14.44 (0.599s vs 0.576s), suggesting the newer compiler's optimizations don't uniformly benefit all code patterns on either microarchitecture.
+- **Key insight**: LAME is a float-heavy, loop-intensive encoder. LLVM's ARM64 backend generates better instruction scheduling and vectorization for the core DCT/psychoacoustic model loops. LLVM also shows tighter variance (more consistent performance). On Volterra, MSVC v14.51 **improved** over v14.50 on this workload (1.104s vs 1.143s), approaching v14.44 levels (1.108s). On the Surface 15, MSVC v14.50 regressed vs v14.44 (0.599s vs 0.576s), suggesting the newer compiler's optimizations don't uniformly benefit all code patterns on both microarchitectures.
 
 ### 2.2 NumPy (v2.4.1) — sqrt & sort
 - **Build system**: Meson with native cross-files
@@ -86,25 +86,25 @@ Collected from benchmark runs on two ARM64 Windows machines:
 - **Build system**: MSBuild (PCBuild)
 - **Workload**: 15 CPU-bound pyperformance benchmarks with --rigorous (40 runs each)
 
-**Volterra (Snapdragon 8cx Gen 3)** — LLVM geo-mean: 59.29ms, MSVC geo-mean: 76.32ms (**+22.3%**, CPython compiled with v14.50):
+**Volterra (Snapdragon 8cx Gen 3)** — LLVM geo-mean: 59.29ms, MSVC geo-mean: 78.20ms (**+24.2%**):
 
 | Benchmark | MSVC (ms) | LLVM (ms) | LLVM faster by |
 |-----------|-----------|-----------|----------------|
-| chaos | 125.28 | 95.43 | 23.8% |
-| crypto_pyaes | 159.65 | 129.96 | 18.6% |
-| deltablue | 7.65 | 5.37 | 29.8% |
-| fannkuch | 799.22 | 664.08 | 16.9% |
-| float | 143.86 | 112.44 | 21.8% |
-| go | 239.54 | 169.25 | 29.3% |
-| hexiom | 13.38 | 10.01 | 25.2% |
-| nbody | 217.38 | 165.48 | 23.9% |
-| pickle_pure_python | 0.78 | 0.56 | 27.5% |
-| pidigits | 311.46 | 326.57 | −4.8% (MSVC faster) |
-| pyflate | 909.70 | 722.03 | 20.6% |
-| raytrace | 578.64 | 437.36 | 24.4% |
-| richards | 98.58 | 68.92 | 30.1% |
-| spectral_norm | 216.10 | 178.38 | 17.5% |
-| unpickle_pure_python | 0.52 | 0.40 | 24.2% |
+| chaos | 128.84 | 95.43 | 25.9% |
+| crypto_pyaes | 160.04 | 129.96 | 18.8% |
+| deltablue | 7.82 | 5.37 | 31.3% |
+| fannkuch | 823.37 | 664.08 | 19.3% |
+| float | 147.18 | 112.44 | 23.6% |
+| go | 247.97 | 169.25 | 31.7% |
+| hexiom | 13.91 | 10.01 | 28.1% |
+| nbody | 218.88 | 165.48 | 24.4% |
+| pickle_pure_python | 0.76 | 0.56 | 26.3% |
+| pidigits | 319.71 | 326.57 | −2.1% (MSVC faster) |
+| pyflate | 939.73 | 722.03 | 23.2% |
+| raytrace | 600.60 | 437.36 | 27.2% |
+| richards | 97.84 | 68.92 | 29.6% |
+| spectral_norm | 227.51 | 178.38 | 21.6% |
+| unpickle_pure_python | 0.55 | 0.40 | 28.3% |
 
 **Surface Laptop 15 (Snapdragon X Elite)** — LLVM geo-mean: 32.11ms, MSVC geo-mean: 49.79ms (**+35.5%**):
 
@@ -126,23 +126,23 @@ Collected from benchmark runs on two ARM64 Windows machines:
 | spectral_norm | 143.00 | 85.43 | 40.3% |
 | unpickle_pure_python | 0.33 | 0.19 | 42.5% |
 
-- **Key insight**: LLVM is faster on 14 out of 15 benchmarks on both machines. The sole exception is **pidigits** (bignum arithmetic via GMP/libmpz) where MSVC is faster — with a 26.2% advantage on the X Elite (vs 4.8% on Volterra). The CPython interpreter on Volterra was not rebuilt with MSVC v14.51 (still compiled with v14.50), so CPython results are unchanged. The Surface 15 consistently shows a **larger LLVM advantage** (27–44%) than Volterra (17–30%), confirming this is a genuine **microarchitecture effect**: the Oryon cores in the X Elite benefit more from LLVM's code generation than the older Kryo cores.
+- **Key insight**: LLVM is faster on 14 out of 15 benchmarks on both machines. The sole exception is **pidigits** (bignum arithmetic via GMP/libmpz) where MSVC is faster — with a 26.2% advantage on the X Elite (vs 2.1% on Volterra). With CPython now rebuilt using MSVC v14.51 on Volterra, overall performance **slightly regressed** compared to v14.50 (78.20ms vs 76.32ms geo-mean, +2.5% slower). Several benchmarks got notably worse: fannkuch (+3%), go (+3.5%), float (+2.3%), pyflate (+3.3%), spectral_norm (+5.3%). This is consistent with the pattern of v14.51 making mixed trade-offs — improving some codegen patterns while regressing others. The Surface 15 consistently shows a **larger LLVM advantage** (27–44%) than Volterra (19–32%), confirming this is a genuine **microarchitecture effect**: the Oryon cores in the X Elite benefit more from LLVM's code generation than the older Kryo cores.
 
 ---
 
 ## 3. Cross-Platform Comparison
 
-The Volterra uses MSVC v14.51 (except CPython, still v14.50), while the Surface 15 uses v14.50. The Surface Laptop 15 (X Elite, 12 cores) is roughly **1.8–2× faster** than the Volterra (8cx Gen 3, 8 cores) in absolute terms across all benchmarks. The **LLVM advantage is consistently larger on the newer X Elite chip**:
+The Volterra uses MSVC v14.51 across all benchmarks, while the Surface 15 uses v14.50. The Surface Laptop 15 (X Elite, 12 cores) is roughly **1.8–2× faster** than the Volterra (8cx Gen 3, 8 cores) in absolute terms across all benchmarks. The **LLVM advantage is consistently larger on the newer X Elite chip**:
 
 | Benchmark | 8cx Gen 3 LLVM adv. | X Elite LLVM adv. |
 |-----------|---------------------|------------------|
-| LAME MP3 | +29.1% | +32.9% |
+| LAME MP3 | +26.6% | +32.9% |
 | NumPy sqrt | +2.6% | +22.6% |
 | NumPy sort | +48.2% | +59.2% |
 | x264 | +19.6% | +29.4% |
-| CPython (geo) | +22.3% | +35.5% |
+| CPython (geo) | +24.2% | +35.5% |
 
-The most notable cross-platform finding is **x264**: MSVC v14.51 on Volterra narrowed the gap to 19.6% (from 29.7% with v14.50), while the Surface 15 (still v14.50) shows 29.4% — this suggests v14.51 made genuine improvements to tight-loop codegen. **NumPy sqrt** is no longer a cross-platform anomaly: v14.51 reverted the v14.50 sqrt optimization, so both machines now show LLVM as faster on sqrt (2.6% on Volterra, 22.6% on X Elite). CPython shows a clear microarchitecture effect: the LLVM advantage grows from 22% (Kryo) to 36% (Oryon), suggesting LLVM's code generation aligns better with the newer out-of-order execution pipeline.
+The most notable cross-platform finding is **x264**: MSVC v14.51 on Volterra narrowed the gap to 19.6% (from 29.7% with v14.50), while the Surface 15 (still v14.50) shows 29.4% — this suggests v14.51 made genuine improvements to tight-loop codegen. **NumPy sqrt** is no longer a cross-platform anomaly: v14.51 reverted the v14.50 sqrt optimization, so both machines now show LLVM as faster on sqrt (2.6% on Volterra, 22.6% on X Elite). CPython shows a clear microarchitecture effect: the LLVM advantage grows from 24% (Kryo) to 36% (Oryon), suggesting LLVM's code generation aligns better with the newer out-of-order execution pipeline.
 
 ---
 
@@ -178,7 +178,7 @@ The most notable cross-platform finding is **x264**: MSVC v14.51 on Volterra nar
 ### 5.3 Project-Specific Findings
 - **LAME**: The VS2019 solution had no ARM64 platform. Required XML patching to clone x64 configurations, add ARM64 `CustomBuild` conditions for `configMS.h → config.h` copy, and exclude x86-specific SSE files (`xmm_quantize_sub.c`).
 - **NumPy**: Meson build with native cross-files (`.ini`) works for both toolchains. No BLAS/LAPACK (built with internal fallback). Original `count_nonzero` benchmark was memory-bandwidth-bound on the X Elite, showing near-zero compiler difference. Switched to `sqrt` and `sort` which are compute-bound. MSVC v14.50 showed dramatically improved sqrt on Volterra (beating LLVM by 30%), but **v14.51 reverted this gain** (now 2.6% behind LLVM). Sort remains heavily LLVM-favored across all versions.
-- **CPython**: Both toolchains produce working Python interpreters. The LLVM-built CPython runs pyperformance benchmarks 22–36% faster depending on the machine. CPython on Volterra was not rebuilt with MSVC v14.51 (still using v14.50-compiled interpreter), so CPython results there are unchanged. On the Surface 15, v14.50 showed no improvement over v14.44.
+- **CPython**: Both toolchains produce working Python interpreters. The LLVM-built CPython runs pyperformance benchmarks 24–36% faster depending on the machine. On Volterra, MSVC v14.51 **slightly regressed** CPython performance vs v14.50 (78.20ms vs 76.32ms geo-mean), with spectral_norm and pyflate showing the largest regressions. On the Surface 15, v14.50 showed no improvement over v14.44.
 - **x264**: Built from source with handcrafted `config.h` (no autotools/MSYS2). x264's unity build pattern (`.c` files `#include`-ing other `.c` files) requires careful source file management. All hand-written ASM disabled to isolate compiler codegen quality.
 
 ---
@@ -189,14 +189,14 @@ The most notable cross-platform finding is **x264**: MSVC v14.51 on Volterra nar
 - LLVM's ARM64 (AArch64) backend has benefited from years of optimization for server and mobile ARM targets (Linux, Android, macOS/Apple Silicon). This maturity shows in consistently better instruction selection and scheduling.
 - MSVC's ARM64 backend has seen **mixed results across versions** on the **Volterra** (8cx Gen 3):
   - v14.50: NumPy sqrt went from 14% slower to **30% faster** than LLVM, x264 gap narrowed from 44% to 30%
-  - **v14.51: Reverted the sqrt optimization** (back to 2.6% slower than LLVM), but **further improved x264** (gap narrowed from 30% to 20%)
+  - **v14.51: Reverted the sqrt optimization** (back to 2.6% slower than LLVM), but **further improved x264** (gap narrowed from 30% to 20%). **LAME improved** (1.104s vs 1.143s), but **CPython regressed** (78.20ms vs 76.32ms geo-mean)
   - This pattern of gains and regressions across versions suggests MSVC's ARM64 optimizer is still maturing, with changes that improve one workload sometimes hurting another
 - On the **Surface 15** (X Elite), v14.50 showed **marginal regressions** vs v14.44:
   - LAME: 0.576s → 0.599s (+4% slower)
   - CPython geo-mean: 48.78ms → 49.79ms (+2% slower)
   - NumPy sqrt: 2.667ms → 2.731ms (still behind LLVM by 23%)
   - This suggests v14.50's optimizations are tuned for the older Kryo microarchitecture and may not translate to the newer Oryon cores
-- For complex branching patterns (sort: 48–59% gap) and interpreter dispatch (22–36% gap), LLVM still leads significantly on both platforms
+- For complex branching patterns (sort: 48–59% gap) and interpreter dispatch (24–36% gap), LLVM still leads significantly on both platforms
 
 ### 6.2 Microarchitecture Sensitivity
 - With the Volterra on MSVC v14.51 and Surface 15 on v14.50, cross-platform comparisons must account for the version difference. However, the **LLVM advantage remains consistently larger on the X Elite** (Oryon) than on the 8cx Gen 3 (Kryo) across all workloads.

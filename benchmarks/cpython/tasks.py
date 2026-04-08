@@ -120,6 +120,8 @@ def _build_cmd(toolchain, pgo=False):
     else:
         # Retarget from CPython's default toolset (v143/VS2022) to current VS
         cmd += ' "/p:PlatformToolset=v145"'
+        if getattr(config, 'MSVC_PREVIEW_TOOLSET', False):
+            cmd += ' "/p:MSVCPreviewEnabled=true"'
     return cmd
 
 

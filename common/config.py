@@ -96,6 +96,7 @@ LAME_WAV_NAME = "pts-trondheim.wav"
 # ---------------------------------------------------------------------------
 MSVC_VERSION_MIN = "14.51"
 MSVC_VCVARS_VER = "14.51"  # Pass to vcvarsall.bat as -vcvars_ver=<ver> to select preview toolset
+MSVC_PREVIEW_TOOLSET = True  # v14.51 is a preview; pass /p:MSVCPreviewEnabled=true to MSBuild
 LLVM_VERSION_MIN = "21.0"
 
 # ---------------------------------------------------------------------------
