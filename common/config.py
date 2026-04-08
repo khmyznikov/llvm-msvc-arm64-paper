@@ -94,7 +94,8 @@ LAME_WAV_NAME = "pts-trondheim.wav"
 # ---------------------------------------------------------------------------
 # Compiler versions (expected)
 # ---------------------------------------------------------------------------
-MSVC_VERSION_MIN = "14.50"
+MSVC_VERSION_MIN = "14.51"
+MSVC_VCVARS_VER = "14.51"  # Pass to vcvarsall.bat as -vcvars_ver=<ver> to select preview toolset
 LLVM_VERSION_MIN = "21.0"
 
 # ---------------------------------------------------------------------------

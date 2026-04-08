@@ -69,10 +69,12 @@ def get_msvc_env() -> dict[str, str]:
 
     Returns a dict suitable for passing to subprocess.run(env=...).
     """
+    from . import config as _cfg
     vcvars = find_vcvarsall()
     # Run vcvarsall then dump env as JSON via python one-liner
+    vcvars_ver_arg = f' -vcvars_ver={_cfg.MSVC_VCVARS_VER}' if _cfg.MSVC_VCVARS_VER else ''
     cmd = (
-        f'cmd /c ""{vcvars}" arm64 >nul 2>&1 && '
+        f'cmd /c ""{vcvars}" arm64{vcvars_ver_arg} >nul 2>&1 && '
         f'python -c "import os,json;print(json.dumps(dict(os.environ)))""'
     )
     out = _run(cmd, shell=True)

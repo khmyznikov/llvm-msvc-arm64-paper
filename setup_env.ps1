@@ -133,9 +133,9 @@ if (-not $vsPath) {
 $msvcVer = $null
 $usedDirectProbe = $false
 if ($vsPath) {
-    # Method 1: vcvarsall (sets full build environment)
+    # Method 1: vcvarsall (sets full build environment) — request preview toolset
     $vcvarsall = Join-Path $vsPath "VC\Auxiliary\Build\vcvarsall.bat"
-    $clVerOutput = cmd /c "`"$vcvarsall`" $primaryVcvarsArg >nul 2>&1 && cl.exe 2>&1" 2>&1
+    $clVerOutput = cmd /c "`"$vcvarsall`" $primaryVcvarsArg -vcvars_ver=14.51 >nul 2>&1 && cl.exe 2>&1" 2>&1
     $msvcVer = ($clVerOutput | Select-String "Version\s+([\d.]+)" |
                 ForEach-Object { $_.Matches[0].Groups[1].Value }) | Select-Object -First 1
 
@@ -153,7 +153,7 @@ if ($vsPath) {
 
 $script:vcvarsallBroken = $false
 if ($vsPath -and $msvcVer) {
-    $minVer = [version]"14.50"
+    $minVer = [version]"14.51"
     $curMajMin = [version]($msvcVer -replace '^(\d+\.\d+).*', '$1')
     if ($curMajMin -ge $minVer) {
         Write-Status "MSVC $primaryPlatform (cl.exe)" "OK" "v$msvcVer at $vsPath"
