@@ -43,11 +43,63 @@ def fetch(c):
 
 
 # ---------------------------------------------------------------------------
+# Patches
+# ---------------------------------------------------------------------------
+
+@task(pre=[fetch])
+def patch(c):
+    """Patch NumPy source for MSVC preview compatibility.
+
+    MSVC 14.51+ preview exposes __builtin_isnan in C mode but not C++ mode.
+    NumPy's Meson build detects it via a C link test, then uses it in C++ files
+    which fail to compile. Fix: guard __builtin_isnan/isinf/isfinite with !_MSC_VER
+    in npy_math.h so MSVC always uses the standard isnan()/isinf()/isfinite().
+    """
+    marker = NUMPY_SRC / ".patched_bench"
+    if marker.exists():
+        print("[numpy] Already patched.")
+        return
+
+    npy_math_h = NUMPY_SRC / "numpy" / "_core" / "include" / "numpy" / "npy_math.h"
+    if npy_math_h.exists():
+        text = npy_math_h.read_text(encoding="utf-8")
+        modified = False
+
+        # Guard __builtin_isnan — MSVC may detect it in C but fail in C++
+        old = "#ifdef HAVE___BUILTIN_ISNAN\n    #define npy_isnan(x) __builtin_isnan(x)"
+        new = "#if defined(HAVE___BUILTIN_ISNAN) && !defined(_MSC_VER)\n    #define npy_isnan(x) __builtin_isnan(x)"
+        if old in text:
+            text = text.replace(old, new)
+            modified = True
+
+        # Guard __builtin_isfinite
+        old = "#ifdef HAVE___BUILTIN_ISFINITE\n    #define npy_isfinite(x) __builtin_isfinite(x)"
+        new = "#if defined(HAVE___BUILTIN_ISFINITE) && !defined(_MSC_VER)\n    #define npy_isfinite(x) __builtin_isfinite(x)"
+        if old in text:
+            text = text.replace(old, new)
+            modified = True
+
+        # Guard __builtin_isinf
+        old = "#ifdef HAVE___BUILTIN_ISINF\n    #define npy_isinf(x) __builtin_isinf(x)"
+        new = "#if defined(HAVE___BUILTIN_ISINF) && !defined(_MSC_VER)\n    #define npy_isinf(x) __builtin_isinf(x)"
+        if old in text:
+            text = text.replace(old, new)
+            modified = True
+
+        if modified:
+            npy_math_h.write_text(text, encoding="utf-8")
+            print("[numpy] Patched npy_math.h: guarded __builtin_isnan/isinf/isfinite against MSVC")
+
+    marker.write_text("patched")
+    print("[numpy] Patches applied.")
+
+
+# ---------------------------------------------------------------------------
 # Build
 # ---------------------------------------------------------------------------
 
 @task(
-    pre=[fetch],
+    pre=[patch],
     help={
         "toolchain": "msvc or llvm (default: msvc)",
     },

@@ -231,6 +231,10 @@ def build(c, toolchain="msvc"):
     msbuild = find_msbuild(env)
 
     out_dir = BENCH_DIR / f"{toolchain}_arm64"
+    if out_dir.exists():
+        import shutil
+        print(f"[lame] Removing previous build: {out_dir}")
+        shutil.rmtree(str(out_dir))
     out_dir.mkdir(parents=True, exist_ok=True)
 
     override_prop = str(OVERRIDE_PROPS).replace("\\", "/")

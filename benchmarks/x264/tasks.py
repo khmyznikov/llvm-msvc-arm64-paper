@@ -191,6 +191,10 @@ def _build_msvc(env):
     to avoid collisions (common/macroblock.c vs encoder/macroblock.c).
     """
     build_dir = BUILD_DIR / "msvc_arm64"
+    if build_dir.exists():
+        import shutil
+        print(f"[x264] Removing previous build: {build_dir}")
+        shutil.rmtree(str(build_dir))
     _write_config_headers(build_dir)
     out_exe = build_dir / "x264.exe"
 
@@ -224,6 +228,10 @@ def _build_msvc(env):
 def _build_llvm(env):
     """Build x264 with clang-cl."""
     build_dir = BUILD_DIR / "llvm_arm64"
+    if build_dir.exists():
+        import shutil
+        print(f"[x264] Removing previous build: {build_dir}")
+        shutil.rmtree(str(build_dir))
     _write_config_headers(build_dir)
     out_exe = build_dir / "x264.exe"
 

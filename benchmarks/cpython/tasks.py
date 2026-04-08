@@ -142,10 +142,16 @@ def build(c, toolchain="msvc", pgo=False):
     cmd = _build_cmd(toolchain, pgo)
 
     print(f"[cpython] Building ({toolchain}/arm64, PGO={pgo})...")
+
+    # Clean previous PCbuild output for a fresh build
+    pcbuild_out = CPYTHON_SRC / "PCbuild" / pinfo["pcbuild"]
+    if pcbuild_out.exists():
+        print(f"[cpython] Removing previous PCbuild output: {pcbuild_out}")
+        shutil.rmtree(pcbuild_out)
+
     subprocess.run(cmd, shell=True, env=env, cwd=str(CPYTHON_SRC), check=True)
 
     # CPython outputs to PCbuild/<platform>/
-    pcbuild_out = CPYTHON_SRC / "PCbuild" / pinfo["pcbuild"]
     python_exe = pcbuild_out / "python.exe"
     if not python_exe.exists():
         print(f"[cpython] Warning: python.exe not found at {python_exe}")
